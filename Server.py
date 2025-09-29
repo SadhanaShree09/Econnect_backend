@@ -3621,10 +3621,11 @@ if __name__ == "__main__":
     key_file_path = os.path.join(os.path.dirname(__file__), '../certificates/key.pem')
     cert_file_path = os.path.join(os.path.dirname(__file__), '../certificates/cert.pem')
 
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(
         "Server:app",  # Replace with your actual file/module name
         host="0.0.0.0",  # Listen on all network interfaces (public access)
-        port=8000,  # Or another port like 4433 if needed
+        port=port,  # Use Railway's provided port or default to 8000
         ssl_keyfile=key_file_path,  # Path to your private key
         ssl_certfile=cert_file_path  # Path to your certificate
     )
