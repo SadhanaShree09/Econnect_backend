@@ -177,13 +177,25 @@ import atexit
 
 
 app = FastAPI()
-origins = [
-    "*"    # Allow all origins for development
-]
+# origins = [
+#     "*"    # Allow all origins for development
+# ]
+
+# Force HTTPS for all requests (prevents Mixed Content errors)
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+
+@app.middleware("http")
+async def force_https(request: Request, call_next):
+    if request.url.scheme == "http":
+        url = request.url.replace(scheme="https")
+        return RedirectResponse(url=str(url))
+    response = await call_next(request)
+    return response
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["https://econnect-frontend-wheat.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
