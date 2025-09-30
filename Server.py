@@ -181,27 +181,20 @@ app = FastAPI()
 #     "*"    # Allow all origins for development
 # ]
 
-# Force HTTPS for all requests (prevents Mixed Content errors)
-from fastapi import Request
-from fastapi.responses import RedirectResponse
+# Remove problematic HTTPS middleware - Railway handles HTTPS automatically
 
+# Add security headers to force HTTPS
 @app.middleware("http")
-async def force_https(request: Request, call_next):
-    # Only redirect if scheme is HTTP, host is not localhost, and X-Forwarded-Proto is not https
-    forwarded_proto = request.headers.get("x-forwarded-proto", "")
-    if (
-        request.url.scheme == "http"
-        and "localhost" not in request.url.hostname
-        and forwarded_proto != "https"
-    ):
-        url = request.url.replace(scheme="https")
-        return RedirectResponse(url=str(url))
+async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
     return response
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://econnect-frontend-wheat.vercel.app"],
+    allow_origins=["https://econnect-frontend-wheat.vercel.app", "http://localhost:5173", "http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
