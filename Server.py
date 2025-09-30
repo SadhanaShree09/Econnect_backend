@@ -6,6 +6,7 @@ from Mongo import Leave, RemoteWork, Otherleave_History_Details,Permission_Histo
 from model import Item4,Item,Item2,Item3,Csvadd,Csvedit,Csvdel,CT,Item5,Item6,Item9,RemoteWorkRequest,Item7,Item8, Tasklist, Taskedit, Deletetask, Gettasks, DeleteLeave, Item9, AddEmployee,EditEmployee,Taskassign, SingleTaskAssign, HolidayYear, Holiday
 from fastapi import FastAPI, HTTPException,Path,Query, HTTPException,Form, Request
 from fastapi.responses import JSONResponse
+from fastapi.responses import RedirectResponse
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Depends, FastAPI,Body
@@ -181,15 +182,29 @@ app = FastAPI()
 #     "*"    # Allow all origins for development
 # ]
 
-# Remove problematic HTTPS middleware - Railway handles HTTPS automatically
-
-# Add security headers to force HTTPS
+# Fix Railway HTTPS handling
 @app.middleware("http")
-async def add_security_headers(request: Request, call_next):
+async def handle_railway_https(request: Request, call_next):
+    # Railway proxy headers handling
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    forwarded_host = request.headers.get("x-forwarded-host", "")
+    
+    # Force HTTPS for production Railway deployment
+    if forwarded_host == "econnectbackend-production.up.railway.app" and forwarded_proto != "https":
+        # Reconstruct HTTPS URL
+        https_url = f"https://{forwarded_host}{request.url.path}"
+        if request.url.query:
+            https_url += f"?{request.url.query}"
+        return RedirectResponse(url=https_url, status_code=301)
+    
     response = await call_next(request)
+    
+    # Add security headers
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Forwarded-Proto"] = "https"
+    
     return response
 
 app.add_middleware(
