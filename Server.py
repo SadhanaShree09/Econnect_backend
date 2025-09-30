@@ -187,8 +187,13 @@ from fastapi.responses import RedirectResponse
 
 @app.middleware("http")
 async def force_https(request: Request, call_next):
-    # Only redirect if scheme is HTTP and host is not localhost
-    if request.url.scheme == "http" and "localhost" not in request.url.hostname:
+    # Only redirect if scheme is HTTP, host is not localhost, and X-Forwarded-Proto is not https
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    if (
+        request.url.scheme == "http"
+        and "localhost" not in request.url.hostname
+        and forwarded_proto != "https"
+    ):
         url = request.url.replace(scheme="https")
         return RedirectResponse(url=str(url))
     response = await call_next(request)
