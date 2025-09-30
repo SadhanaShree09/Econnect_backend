@@ -185,6 +185,14 @@ app = FastAPI()
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 
+@app.middleware("http")
+async def force_https(request: Request, call_next):
+    # Only redirect if scheme is HTTP and host is not localhost
+    if request.url.scheme == "http" and "localhost" not in request.url.hostname:
+        url = request.url.replace(scheme="https")
+        return RedirectResponse(url=str(url))
+    response = await call_next(request)
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -2486,7 +2494,7 @@ async def trigger_deadline_check():
     """Manually trigger deadline checking for testing/immediate needs"""
     try:
         overdue_count = await Mongo.check_and_notify_overdue_tasks()
-        upcoming_count = await Mongo.check_upcoming_deadlines_enhanced()
+        upcoming_count = await Mongo.check_upcoming_deadlines()
         
         return {
             "status": "success",
@@ -2891,28 +2899,19 @@ async def debug_notifications(userid: str):
         for notif in recent_notifications:
             notif["_id"] = str(notif["_id"])
             if "created_at" in notif:
-                notif["created_at"] = notif["created_at"].isoformat() if hasattr(notif["created_at"], 'isoformat') else str(notif["created_at"])
+                notif["created_at"] = notif["created_at"].isoformat() + "Z"
             if "updated_at" in notif:
-                notif["updated_at"] = notif["updated_at"].isoformat() if hasattr(notif["updated_at"], 'isoformat') else str(notif["updated_at"])
+                notif["updated_at"] = notif["updated_at"].isoformat() + "Z"
+        
+        # Check WebSocket connection
+        is_connected = userid in notification_manager.active_connections
+        connection_count = notification_manager.get_user_connection_count(userid)
         
         return {
             "userid": userid,
             "recent_notifications": recent_notifications,
-            "total_notifications": Mongo.Notifications.count_documents({"userid": userid}),
-            "unread_count": Mongo.get_unread_notification_count(userid)
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching debug info: {str(e)}")
-
-# Task deadline management endpoints
-@app.post("/tasks/check-overdue")
-async def manually_check_overdue_tasks():
-    """Manually trigger overdue task check"""
-    try:
-        overdue_count = await Mongo.check_and_notify_overdue_tasks()
-        return {
-            "message": f"Checked overdue tasks successfully",
-            "overdue_tasks_found": overdue_count
+            "is_connected": is_connected,
+            "connection_count": connection_count
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking overdue tasks: {str(e)}")
