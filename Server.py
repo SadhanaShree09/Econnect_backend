@@ -707,6 +707,7 @@ def previous_day_clockout(Data: CT):
 
 # Clockin Details
 @app.get("/clock-records/{userid}")
+@app.get("/clock-records/{userid}/")  # Also handle requests with trailing slash
 async def get_clock_records(userid: str = Path(..., title="The name of the user whose clock records you want to fetch")):
     try:
         clock_records = attendance_details(userid)
@@ -917,6 +918,7 @@ async def bonus_leave_request(item: Item9):
 
 # Leave History
 @app.get("/leave-History/{userid}")
+@app.get("/leave-History/{userid}/")  # Also handle requests with trailing slash
 async def get_leave_History(userid: str = Path(..., title="The userid of the user")):
     try:
        
@@ -1318,6 +1320,7 @@ async def remote_work_request(request: RemoteWorkRequest):
 
 # Remote Work History    
 @app.get("/Remote-History/{userid}")
+@app.get("/Remote-History/{userid}/")  # Also handle requests with trailing slash
 async def get_Remote_History(userid:str = Path(..., title="The name of the user whose Remote History you want to fetch")):
     try:
         Remote_History = Remote_History_Details(userid)
@@ -1450,6 +1453,7 @@ async def update_remote_work_request_status(userid: str = Form(...), status: str
    
 # Admin Page User Leave History
 @app.get("/approved-leave-history/{name}")
+@app.get("/approved-leave-history/{name}/")  # Also handle requests with trailing slash
 def get_leave_history(name: str = Path(..., title= "Team lead name")):
     leave_history = get_approved_leave_history(name)
     return {"leave_history": leave_history}
@@ -1705,6 +1709,7 @@ async def permission_request(item: Item8):
         raise HTTPException(400, str(e))
    
 @app.get("/Other-leave-history/{userid}")
+@app.get("/Other-leave-history/{userid}/")  # Also handle requests with trailing slash
 async def get_other_leave_history(userid: str = Path(..., title="The ID of the user")):
     try:
         # Call your function to get the leave history for the specified user
@@ -1718,6 +1723,7 @@ async def get_other_leave_history(userid: str = Path(..., title="The ID of the u
    
    
 @app.get("/Permission-history/{userid}")
+@app.get("/Permission-history/{userid}/")  # Also handle requests with trailing slash
 async def get_Permission_history(userid: str = Path(..., title="The ID of the user")):
     try:
         # Call your function to get the leave history for the specified user
@@ -1769,6 +1775,7 @@ async def get_Permission_history(userid: str = Path(..., title="The ID of the us
 
 
 @app.get("/leave_details/user/{userid}")
+@app.get("/leave_details/user/{userid}/")  # Also handle requests with trailing slash
 async def get_user_leave_details(
     userid: str,
     status_filter: str = Query("All", alias="statusFilter"),
@@ -1814,6 +1821,7 @@ async def get_user_leave_details(
 # ============== REMOTE WORK ENDPOINTS ==============
 
 @app.get("/remote_work_details/user/{userid}")
+@app.get("/remote_work_details/user/{userid}/")  # Also handle requests with trailing slash
 async def get_user_remote_work_details(
     userid: str,
     status_filter: str = Query("All", alias="statusFilter")
@@ -2606,6 +2614,7 @@ async def task_delete(taskid: str):
 
 
 @app.get("/get_tasks/{userid}")
+@app.get("/get_tasks/{userid}/")  # Also handle requests with trailing slash
 async def get_tasks(userid: str):
     result = get_the_tasks(userid)
     if not result:
