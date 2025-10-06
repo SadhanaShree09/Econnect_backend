@@ -36,7 +36,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # GridFS setup
 from pymongo import MongoClient
 import gridfs
-client = MongoClient("mongodb://localhost:27017") 
+mongo_url = os.environ.get("MONGODB_URI", "mongodb://localhost:27017")
+client = MongoClient(
+    mongo_url,
+    serverSelectionTimeoutMS=30000,
+    connectTimeoutMS=30000,
+    socketTimeoutMS=30000
+) 
 db = client["RBG_AI"]  
 fs = gridfs.GridFS(db)
 
@@ -2729,6 +2735,14 @@ async def upload_task_file(
 
     try:
         file_bytes = await file.read()
+        
+        # Test MongoDB connection before attempting to save
+        try:
+            client.admin.command('ping')
+        except Exception as conn_error:
+            print(f"MongoDB connection error: {conn_error}")
+            raise HTTPException(status_code=503, detail=f"Database connection failed: {str(conn_error)}")
+        
         gridfs_id = fs.put(file_bytes, filename=file.filename, content_type=file.content_type, uploadedBy=uploaded_by)
         file_meta = {
             "id": str(gridfs_id),
@@ -2794,12 +2808,16 @@ async def upload_task_file(
                     )
         except Exception as e:
             print(f"Error sending file upload notification: {e}")
+            traceback.print_exc()
 
         return {"message": "File uploaded successfully", "file": file_meta}
         
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"File upload error: {e}")  # DEBUG
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"File upload error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 @app.get("/task/{taskid}/files/{fileid}")
 async def get_task_file(taskid: str, fileid: str):
