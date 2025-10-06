@@ -178,7 +178,8 @@ import atexit
 
 
 app = FastAPI()
-# origins = [
+origins = ["https://econnect-frontend-wheat.vercel.app", "http://localhost:5173", "http://localhost:5174"]
+# [
 #     "*"    # Allow all origins for development
 # ]
 
@@ -193,7 +194,7 @@ async def add_security_headers(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://econnect-frontend-wheat.vercel.app", "http://localhost:5173", "http://localhost:5174"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -218,39 +219,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-scheduler = BackgroundScheduler()
-
-scheduler.add_job(auto_clockout, "cron", hour=21, minute=30)  # example: 21:30 IST
-scheduler.start()
-
-# Initialize task scheduler on application startup
-@app.on_event("startup")
-async def startup_event():
-    """Initialize task deadline scheduler when the application starts"""
-    try:
-        scheduler = Mongo.setup_task_scheduler()
-        if scheduler:
-            print("✅ Task deadline monitoring system initialized")
-        else:
-            print("⚠️ Failed to initialize task deadline scheduler")
-    except Exception as e:
-        print(f"❌ Error initializing task scheduler: {e}")
-
-# Store scheduler reference for potential cleanup
-task_scheduler = None
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup scheduler when application shuts down"""
-    global task_scheduler
-    if task_scheduler:
-        try:
-            task_scheduler.shutdown()
-            print("✅ Task scheduler shut down successfully")
-        except Exception as e:
-            print(f"⚠️ Error shutting down scheduler: {e}")
-
-# Initialize APScheduler
+# Initialize APScheduler for background tasks
 scheduler = BackgroundScheduler()
 
 # Import notification automation
@@ -262,8 +231,9 @@ from notification_automation import (
     check_pending_approvals
 )
 
-# Schedule the auto-clockout task to run daily at 9:30 AM
-scheduler.add_job(auto_clockout, 'cron', hour=9, minute=30, id='auto_clockout')
+# Schedule the auto-clockout task to run daily at 9:30 PM (21:30 IST)
+# This ensures employees who forget to clock out are automatically clocked out at end of day
+scheduler.add_job(auto_clockout, 'cron', hour=21, minute=30, id='auto_clockout')
 
 # Define sync wrapper functions for async tasks
 def sync_check_upcoming_deadlines():
@@ -368,6 +338,38 @@ scheduler.add_job(
 # Start the scheduler
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
+
+# Initialize task scheduler on application startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize task deadline scheduler when the application starts"""
+    try:
+        task_scheduler = Mongo.setup_task_scheduler()
+        if task_scheduler:
+            print("✅ Task deadline monitoring system initialized")
+        else:
+            print("⚠️ Failed to initialize task deadline scheduler")
+        
+        # Log scheduled jobs
+        print("\n📅 Scheduled Background Jobs:")
+        print(f"  - Auto Clock-out: Daily at 9:30 PM IST")
+        print(f"  - Deadline Check: Daily at 8:00 AM IST")
+        print(f"  - Attendance Check: Daily at 10:00 AM IST")
+        print(f"  - Overdue Tasks: Daily at 12:00 PM IST")
+        print(f"  - Comprehensive Check: Daily at 6:00 PM IST")
+        print(f"  - Attendance Stats Update: Daily at 11:59 PM IST\n")
+    except Exception as e:
+        print(f"❌ Error initializing task scheduler: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup scheduler when application shuts down"""
+    try:
+        if scheduler:
+            scheduler.shutdown()
+            print("✅ Background scheduler shut down successfully")
+    except Exception as e:
+        print(f"⚠️ Error shutting down scheduler: {e}")
 
 
 @app.get("/")
@@ -613,16 +615,43 @@ def userbyid(item:Item3):
 # Time Management
 @app.post('/Clockin')
 def clockin(Data: CT):
-    print(Data)
-    time = Data.current_time
-    result = Mongo.Clockin(userid=Data.userid, name=Data.name, time=time)
-    return {"message":result}
+    from datetime import datetime
+    import pytz
+    # Always use full datetime string for clock-in
+    ist = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(ist)
+    # If Data.current_time is provided, try to parse it, else use now
+    time = getattr(Data, 'current_time', None)
+    if time:
+        try:
+            # Try to parse as datetime string
+            clockin_dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
+            time_str = clockin_dt.isoformat()
+        except Exception:
+            # Fallback: treat as time only, combine with today
+            time_str = now.isoformat()
+    else:
+        time_str = now.isoformat()
+    result = Mongo.Clockin(userid=Data.userid, name=Data.name, time=time_str)
+    return {"message": result}
 
 @app.post('/Clockout')
 def clockout(Data: CT):
-    time = Data.current_time
-    result = Mongo.Clockout(userid=Data.userid, name=Data.name, time=time)
-    return {"message":result}
+    from datetime import datetime
+    import pytz
+    ist = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(ist)
+    time = getattr(Data, 'current_time', None)
+    if time:
+        try:
+            clockout_dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
+            time_str = clockout_dt.isoformat()
+        except Exception:
+            time_str = now.isoformat()
+    else:
+        time_str = now.isoformat()
+    result = Mongo.Clockout(userid=Data.userid, name=Data.name, time=time_str)
+    return {"message": result}
 
 # Test endpoint for attendance notifications
 @app.post('/test-attendance-notification')

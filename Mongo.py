@@ -284,58 +284,80 @@ def manager_Gsignin(checkuser, client_name):
 
 
 def Clockin(userid, name, time):
-    today = date.today()
-
+    """
+    Clock-in function for office attendance system.
+    Ensures timezone-aware datetime storage and prevents multiple clock-ins per day.
+    """
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
+    now = datetime.now(ist)
+    
     try:
-        # Parse the clock-in time
-        clockin_time = datetime.strptime(time, "%I:%M:%S %p")
+        # Parse the clock-in time - ensure it's timezone-aware
+        if time and len(time) > 10:
+            # If time is already a datetime string (ISO format)
+            clockin_dt = parser.parse(time)
+            # Ensure it's timezone-aware
+            if clockin_dt.tzinfo is None:
+                clockin_dt = ist.localize(clockin_dt)
+        else:
+            # Use current time if not provided or invalid
+            clockin_dt = now
 
-        # Determine the status based on clock-in time
-        status = "Present" if datetime.strptime("08:30:00 AM", "%I:%M:%S %p") <= clockin_time <= datetime.strptime("10:30:00 AM", "%I:%M:%S %p") else "Late"
+        # Ensure clock-in is for today only
+        if clockin_dt.date() != today:
+            clockin_dt = clockin_dt.replace(year=today.year, month=today.month, day=today.day)
+
+        # Determine the status based on clock-in time (8:30 AM - 10:30 AM = Present, else Late)
+        clockin_time_only = clockin_dt.time()
+        start_time = datetime.strptime("08:30:00", "%H:%M:%S").time()
+        end_time = datetime.strptime("10:30:00", "%H:%M:%S").time()
+        status = "Present" if start_time <= clockin_time_only <= end_time else "Late"
 
         # Check for an existing record for today
         existing_record = Clock.find_one({'date': str(today), 'name': name})
-
-        if existing_record and 'clockin' in existing_record:
-            # If the user has already clocked in, return the existing time
-            existing_clockin_time = existing_record['clockin']
-            return f"Already clocked in at {existing_clockin_time}"
+        
+        if existing_record and 'clockin' in existing_record and existing_record['clockin']:
+            # User already clocked in today - return the existing time
+            try:
+                existing_clockin = parser.parse(existing_record['clockin'])
+                return f"Already clocked in at {existing_clockin.strftime('%I:%M:%S %p')}"
+            except:
+                return f"Already clocked in today"
+        
         elif existing_record:
-            # If a record exists without clock-in, update it
+            # Update existing record with clock-in
             Clock.find_one_and_update(
                 {'date': str(today), 'name': name},
-                {'$set': {'clockin': time, 'status': status}}
+                {'$set': {
+                    'clockin': clockin_dt.isoformat(),
+                    'status': status,
+                    'userid': userid
+                }}
             )
         else:
-            # If no record exists, create a new one
+            # Create new attendance record for today
             record = {
                 'userid': userid,
                 'date': str(today),
                 'name': name,
-                'clockin': time,
+                'clockin': clockin_dt.isoformat(),
                 'status': status,
                 'remark': ''
             }
-
-            if today.weekday() == 6:  # Sunday (weekday() returns 6 for Sunday)
-                record['bonus_leave'] = "Not Taken"  # Add Sunday-specific data
-
+            
+            # Add bonus leave field for Sunday
+            if today.weekday() == 6:
+                record['bonus_leave'] = "Not Taken"
+            
             Clock.insert_one(record)
-
-        # Create attendance notification for successful clock-in
-            create_attendance_notification(userid=userid,
-                                            message=f"Successfully clocked in at {time}. Status: {status}",
-                                            priority="low",
-                                            attendance_type="clock_in")
-
-        return "Clock-in successful"
-
-    except ValueError as e:
-        print(f"Error parsing time: {e}")
-        return "Invalid time format"
+        
+        # Return success message
+        return f"Clock-in successful at {clockin_dt.strftime('%I:%M:%S %p')}"
+        
     except Exception as e:
-        print(f"An error occurred: {e}")
-        return "An error occurred while clocking in"
+        print(f"Error during clock-in for {name}: {str(e)}")
+        return f"Error during clock-in: {str(e)}"
 
 
 
@@ -350,152 +372,299 @@ def parse_time_string(time_str):
 
 # Define the auto-clockout function
 def auto_clockout():
+    """
+    Automatic clock-out function that runs at end of day.
+    Clocks out all users who haven't clocked out yet with default time.
+    - Runs at scheduled time (e.g., 9:30 PM)
+    - Caps work duration at 24 hours
+    - Sends notifications to affected users
+    """
     print("Running auto-clockout task...")
-    today = datetime.now(pytz.timezone("Asia/Kolkata")).date()
-    clockout_default_time = datetime.strptime("09:30:00 AM", "%I:%M:%S %p").time()  # Default clock-out time
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
+    
+    # Default clock-out time - typically end of business day
+    # You can change this to 6:30 PM or 8:00 PM as needed
+    clockout_default_time = datetime.strptime("09:30:00 PM", "%I:%M:%S %p").time()
 
     # Find all users who clocked in today but haven't clocked out
     clocked_in_users = Clock.find({'date': str(today), 'clockout': {'$exists': False}})
 
+    users_processed = 0
     for record in clocked_in_users:
-        name = record['name']
-        userid = record.get('userid', '')
-        clockin_time = parser.parse(record['clockin'])
-
-        # Set clock-out time to default time (8:00 PM)
-        clockout_time = datetime.combine(today, clockout_default_time)
-
-        # Calculate total hours worked
-        total_seconds_worked = (clockout_time - clockin_time).total_seconds()
-        total_hours_worked = total_seconds_worked / 3600
-        remaining_seconds = total_seconds_worked % 3600
-        total_minutes_worked = remaining_seconds // 60
-
-        # Add a remark based on hours worked
-        remark = "N/A" if total_hours_worked >= 8 else "Incomplete"
-
-        hours_text = f'{int(total_hours_worked)} hours {int(total_minutes_worked)} minutes'
-
-        # Update the clock-out time in the database
-        Clock.find_one_and_update(
-            {'_id': record['_id']},  # Use the record's unique ID for update
-            {'$set': {
-                'clockout': clockout_time.strftime("%I:%M:%S %p"),
-                'total_hours_worked': hours_text,
-                'remark': remark
-            }}
-        )
-
-        # Create auto clock-out notification
-        if userid:
-            create_attendance_notification(
-                userid=userid,
-                message=f"Automatic clock-out completed at {clockout_time.strftime('%I:%M:%S %p')}. Total work time: {hours_text}. Please review your attendance.",
-                priority="medium",
-                attendance_type="auto_clock_out"
+        try:
+            name = record.get('name', 'Unknown')
+            userid = record.get('userid', '')
+            
+            # Parse clock-in time
+            clockin_time = parser.parse(record['clockin'])
+            if clockin_time.tzinfo is None:
+                clockin_time = ist.localize(clockin_time)
+            
+            # Set clock-out time to default time
+            clockout_time = ist.localize(datetime.combine(today, clockout_default_time))
+            
+            # Safety: ensure clock-out is not before clock-in
+            if clockout_time < clockin_time:
+                # If default time is before clock-in, set to end of day
+                clockout_time = ist.localize(datetime.combine(today, datetime.strptime("23:59:59", "%H:%M:%S").time()))
+            
+            # Cap clock-out time to end of day
+            end_of_day = ist.localize(datetime.combine(today, datetime.strptime("23:59:59", "%H:%M:%S").time()))
+            if clockout_time > end_of_day:
+                clockout_time = end_of_day
+            
+            # Calculate total hours worked (never more than 24h)
+            total_seconds_worked = (clockout_time - clockin_time).total_seconds()
+            
+            # Safety checks
+            if total_seconds_worked < 0:
+                total_seconds_worked = 0
+                clockout_time = clockin_time
+            
+            if total_seconds_worked > 86400:
+                total_seconds_worked = 86400
+                clockout_time = clockin_time + timedelta(seconds=86400)
+            
+            # Calculate hours and minutes
+            total_hours_worked = int(total_seconds_worked // 3600)
+            total_minutes_worked = int((total_seconds_worked % 3600) // 60)
+            
+            # Determine remark
+            remark = "Auto Clock-out - Complete" if total_hours_worked >= 8 else "Auto Clock-out - Incomplete"
+            
+            # Format work duration
+            hours_text = f'{total_hours_worked} hours {total_minutes_worked} minutes'
+            
+            # Update the clock-out time in the database
+            Clock.find_one_and_update(
+                {'_id': record['_id']},
+                {'$set': {
+                    'clockout': clockout_time.isoformat(),
+                    'total_hours_worked': hours_text,
+                    'remark': remark
+                }}
             )
+            
+            # Create auto clock-out notification
+            if userid:
+                try:
+                    create_attendance_notification(
+                        userid=userid,
+                        message=f"Automatic clock-out at {clockout_time.strftime('%I:%M:%S %p')}. Work time: {hours_text}. Please review your attendance.",
+                        priority="medium",
+                        attendance_type="auto_clock_out"
+                    )
+                except Exception as notif_error:
+                    print(f"Notification error for {name}: {str(notif_error)}")
+            
+            print(f"✓ Auto clock-out for {name}: {hours_text}")
+            users_processed += 1
+            
+        except Exception as e:
+            print(f"✗ Error processing auto clock-out for record {record.get('_id')}: {str(e)}")
+            continue
 
-        print(f"Auto clock-out completed for user: {name}")
-
-    print("Auto-clockout task completed.")
+    print(f"Auto-clockout completed. Processed {users_processed} users.")
+    return users_processed
 
 def Clockout(userid, name, time):
-    today = datetime.now(pytz.timezone("Asia/Kolkata")).date()  # Use datetime.now() with timezone
-    current_time = datetime.now(pytz.timezone("Asia/Kolkata")).time()
-    clockout_default_time = datetime.strptime("9:30:00 AM", "%I:%M:%S %p").time()  # Default clock-out time (8:00 PM)
-
-    # Check the clock-in record for the user today
+    """
+    Clock-out function for office attendance system.
+    - Ensures work duration never exceeds 24 hours
+    - Prevents clock-out for previous day's clock-in
+    - Calculates actual work duration accurately
+    """
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
+    now = datetime.now(ist)
+    
+    # Find today's attendance record
     record = Clock.find_one({'date': str(today), 'name': name})
     
-    if record:
-        # Check if clock-out is already recorded for today
-        if 'clockout' in record:
-            return f"Clock-out already recorded at {record['clockout']}"
-
-        clockin_time = parser.parse(record['clockin'])
-
-        # Determine the clock-out time
-        if not time:
-            # If no clock-out time is provided, set default to 8:00 PM
-            if current_time >= clockout_default_time:
-                clockout_time = datetime.combine(today, clockout_default_time)
-            else:
-                # If called before 6:00 PM without manual clock-out, consider no action yet
-                return "Clock-out not yet due for auto clock-out. Manual clock-out required before 6:00 PM.", None
-        else:
-            # Parse the provided time as clock-out time
-            clockout_time = parse_time_string(time)
-
-        # Calculate total hours worked
-        total_seconds_worked = (clockout_time - clockin_time).total_seconds()
-        total_hours_worked = total_seconds_worked / 3600
-        remaining_seconds = total_seconds_worked % 3600
-        total_minutes_worked = remaining_seconds // 60
-
-        # Add a remark based on hours worked
-        remark = "N/A" if total_hours_worked >= 8 else "Incomplete"
-
-        hours_text = f'{int(total_hours_worked)} hours {int(total_minutes_worked)} minutes'
-
-        # Update the clock-out time in the database
-        Clock.find_one_and_update(
-            {'date': str(today), 'name': name},
-            {'$set': {
-                'clockout': clockout_time.strftime("%I:%M:%S %p"),
-                'total_hours_worked': hours_text,
-                'remark': remark
-            }}
-        )
-
-        # (Removed notification for successful clock-out)
-        return "Clock-out sucessful"
+    if not record:
+        # Check if user has a previous day's clock-in without clock-out
+        prev_record = Clock.find_one({'name': name, 'clockout': {'$exists': False}})
+        if prev_record:
+            prev_date = prev_record.get('date', '')
+            return f"You have an incomplete clock-in from {prev_date}. Please use the 'Previous Day Clock-out' option first."
+        return "Please clock in first before clocking out."
+    
+    # Check if already clocked out
+    if 'clockout' in record and record['clockout']:
+        try:
+            existing_clockout = parser.parse(record['clockout'])
+            return f"Already clocked out at {existing_clockout.strftime('%I:%M:%S %p')}"
+        except:
+            return "Already clocked out today"
+    
+    # Parse clock-in time
+    try:
+        clockin_dt = parser.parse(record['clockin'])
+        # Ensure timezone-aware
+        if clockin_dt.tzinfo is None:
+            clockin_dt = ist.localize(clockin_dt)
+    except Exception as e:
+        return f"Error reading clock-in time: {str(e)}"
+    
+    # Verify clock-in is today
+    if clockin_dt.date() != today:
+        return f"Your clock-in was on {clockin_dt.date()}. Please use the 'Previous Day Clock-out' option."
+    
+    # Determine the clock-out time
+    if time and len(time) > 10:
+        try:
+            clockout_time = parser.parse(time)
+            if clockout_time.tzinfo is None:
+                clockout_time = ist.localize(clockout_time)
+        except:
+            clockout_time = now
     else:
-        # No clock-in record found for today; prompt user to clock-in first
-        return "Clock-in required before clock-out."
-
-
-def PreviousDayClockout(userid, name):
-    today = datetime.now(pytz.timezone("Asia/Kolkata")).date()
-    previous_day = today - timedelta(days=1)
-    # clockout_default_time = datetime.strptime("6:30:00 PM", "%I:%M:%S %p").time()
-    clockout_default_time = datetime.strptime("3:00:00 PM", "%I:%M:%S %p").time()
+        clockout_time = now
     
-    # Fetch the previous day's record
-    prev_day_record = Clock.find_one({'date': str(previous_day), 'name': name})
-    if not prev_day_record:
-        return "No clock-in record found for the previous day."
-
-    if 'clockout' in prev_day_record:
-        return f"Clock-out already recorded at {prev_day_record['clockout']} for the previous day."
-
-    # Parse the clock-in time
-    prev_clockin_time = parser.parse(prev_day_record['clockin'])
+    # Ensure clock-out is for today only
+    if clockout_time.date() != today:
+        clockout_time = clockout_time.replace(year=today.year, month=today.month, day=today.day)
     
-    # Set the clock-in date to be the same as previous_day
-    prev_clockin_time = prev_clockin_time.replace(year=previous_day.year, month=previous_day.month, day=previous_day.day)
+    # Prevent clock-out before clock-in
+    if clockout_time < clockin_dt:
+        return "Clock-out time cannot be before clock-in time."
     
-    # Combine the previous_day with the default clock-out time to set prev_clockout_time
-    prev_clockout_time = datetime.combine(previous_day, clockout_default_time)
-
-    # Calculate total hours worked for the previous day
-    total_seconds_worked = (prev_clockout_time - prev_clockin_time).total_seconds()
-    total_hours_worked = total_seconds_worked / 3600
-    remaining_seconds = total_seconds_worked % 3600
-    total_minutes_worked = remaining_seconds // 60
-
-    # Add a remark based on hours worked
-    remark = "N/A" if total_hours_worked >= 8 else "Incomplete"
-
-    # Update the previous day's record with the default clock-out time
+    # Cap clock-out time to end of day (23:59:59) to prevent multi-day durations
+    end_of_day = ist.localize(datetime.combine(today, datetime.strptime("23:59:59", "%H:%M:%S").time()))
+    if clockout_time > end_of_day:
+        clockout_time = end_of_day
+    
+    # Calculate total hours worked (maximum 24 hours)
+    total_seconds_worked = (clockout_time - clockin_dt).total_seconds()
+    
+    # Safety check - should never be negative at this point
+    if total_seconds_worked < 0:
+        return "Invalid time calculation. Please contact administrator."
+    
+    # Cap at 24 hours (86400 seconds) for safety
+    if total_seconds_worked > 86400:
+        total_seconds_worked = 86400
+        clockout_time = clockin_dt + timedelta(seconds=86400)
+    
+    # Calculate hours and minutes
+    total_hours_worked = int(total_seconds_worked // 3600)
+    total_minutes_worked = int((total_seconds_worked % 3600) // 60)
+    
+    # Determine remark based on hours worked (8+ hours = complete workday)
+    remark = "Complete" if total_hours_worked >= 8 else "Incomplete"
+    
+    # Format work duration text
+    hours_text = f'{total_hours_worked} hours {total_minutes_worked} minutes'
+    
+    # Update the database with clock-out information
     Clock.find_one_and_update(
-        {'date': str(previous_day), 'name': name},
+        {'date': str(today), 'name': name},
         {'$set': {
-            'clockout': prev_clockout_time.strftime("%I:%M:%S %p"),
-            'total_hours_worked': f'{int(total_hours_worked)} hours {int(total_minutes_worked)} minutes',
+            'clockout': clockout_time.isoformat(),
+            'total_hours_worked': hours_text,
             'remark': remark
         }}
     )
-    return f"Previous day's clock-out auto-recorded for {name} at {prev_clockout_time.strftime('%I:%M:%S %p')}."
+    
+    return f"Clock-out successful at {clockout_time.strftime('%I:%M:%S %p')}. Total work time: {hours_text}"
+
+
+def PreviousDayClockout(userid, name):
+    """
+    Clock-out function for previous day's incomplete attendance.
+    Used when user forgets to clock out and needs to complete previous day's record.
+    - Sets default clock-out time (configurable)
+    - Caps work duration at 24 hours
+    - Marks as auto-completed
+    """
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
+    previous_day = today - timedelta(days=1)
+    
+    # Default clock-out time for missed clock-outs (typically end of business day)
+    # You can change this to suit your office hours (e.g., 6:30 PM)
+    clockout_default_time = datetime.strptime("06:30:00 PM", "%I:%M:%S %p").time()
+    
+    # Fetch the previous day's record
+    prev_day_record = Clock.find_one({'date': str(previous_day), 'name': name})
+    
+    if not prev_day_record:
+        return "No clock-in record found for the previous day."
+
+    if 'clockout' in prev_day_record and prev_day_record['clockout']:
+        try:
+            existing_clockout = parser.parse(prev_day_record['clockout'])
+            return f"Already clocked out at {existing_clockout.strftime('%I:%M:%S %p')} on {previous_day}"
+        except:
+            return f"Clock-out already recorded for {previous_day}"
+
+    # Parse the clock-in time
+    try:
+        prev_clockin_time = parser.parse(prev_day_record['clockin'])
+        # Ensure timezone-aware
+        if prev_clockin_time.tzinfo is None:
+            prev_clockin_time = ist.localize(prev_clockin_time)
+        
+        # Ensure the date is correct (previous day)
+        prev_clockin_time = prev_clockin_time.replace(
+            year=previous_day.year,
+            month=previous_day.month,
+            day=previous_day.day
+        )
+    except Exception as e:
+        return f"Error reading previous day's clock-in time: {str(e)}"
+    
+    # Set clock-out time to default time for previous day
+    prev_clockout_time = ist.localize(datetime.combine(previous_day, clockout_default_time))
+    
+    # Ensure clock-out is not before clock-in
+    if prev_clockout_time < prev_clockin_time:
+        # If somehow default time is before clock-in, set to end of that day
+        prev_clockout_time = ist.localize(
+            datetime.combine(previous_day, datetime.strptime("23:59:59", "%H:%M:%S").time())
+        )
+    
+    # Cap clock-out time to end of previous day
+    end_of_prev_day = ist.localize(
+        datetime.combine(previous_day, datetime.strptime("23:59:59", "%H:%M:%S").time())
+    )
+    if prev_clockout_time > end_of_prev_day:
+        prev_clockout_time = end_of_prev_day
+    
+    # Calculate total hours worked (maximum 24 hours)
+    total_seconds_worked = (prev_clockout_time - prev_clockin_time).total_seconds()
+    
+    # Safety checks
+    if total_seconds_worked < 0:
+        total_seconds_worked = 0
+        prev_clockout_time = prev_clockin_time
+    
+    if total_seconds_worked > 86400:
+        total_seconds_worked = 86400
+        prev_clockout_time = prev_clockin_time + timedelta(seconds=86400)
+    
+    # Calculate hours and minutes
+    total_hours_worked = int(total_seconds_worked // 3600)
+    total_minutes_worked = int((total_seconds_worked % 3600) // 60)
+    
+    # Determine remark
+    remark = "Previous Day Auto-Complete" if total_hours_worked >= 8 else "Previous Day Incomplete"
+    
+    # Format work duration
+    hours_text = f'{total_hours_worked} hours {total_minutes_worked} minutes'
+    
+    # Update the previous day's record with the clock-out time
+    Clock.find_one_and_update(
+        {'date': str(previous_day), 'name': name},
+        {'$set': {
+            'clockout': prev_clockout_time.isoformat(),
+            'total_hours_worked': hours_text,
+            'remark': remark
+        }}
+    )
+    
+    return f"Previous day ({previous_day}) clock-out completed at {prev_clockout_time.strftime('%I:%M:%S %p')}. Work time: {hours_text}"
 
 
 # User Page Attendance Details
