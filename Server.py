@@ -931,6 +931,7 @@ async def get_leave_History(userid: str = Path(..., title="The userid of the use
 # HR Page To Fetch Every Users Leave Requests
 # HR endpoint - Uses get_user_leave_requests
 @app.get("/all_users_leave_requests/")
+@app.get("/all_users_leave_requests")  # Also handle requests without trailing slash
 async def fetch_user_leave_requests(selectedOption: str = Query(..., alias="selectedOption")):
     print(f"DEBUG: /all_users_leave_requests endpoint called - selectedOption: {selectedOption}")
     user_leave_requests = get_user_leave_requests(selectedOption) # HR sees recommended
@@ -959,6 +960,7 @@ async def fetch_user_leave_requests(selectedOption: str = Query(..., alias="sele
 
 # Admin Page To Fetch Only Managers Leave Requests
 @app.get("/manager_leave_requests/")
+@app.get("/manager_leave_requests")  # Also handle requests without trailing slash
 async def fetch_manager_leave_requests(selectedOption: str = Query(..., alias="selectedOption")):
     print(f"DEBUG: /manager_leave_requests endpoint called - selectedOption: {selectedOption}")
     user_leave_requests = get_manager_leave_requests(selectedOption) # Admin sees manager requests
@@ -967,6 +969,7 @@ async def fetch_manager_leave_requests(selectedOption: str = Query(..., alias="s
 
 #TL,Manager Page To Fetch Only Users Leave Requests Under Their Team
 @app.get("/only_users_leave_requests/")
+@app.get("/only_users_leave_requests")  # Also handle requests without trailing slash
 async def fetch_users_leave_requests(selectedOption: str = Query(..., alias="selectedOption"), TL: str = Query(..., alias="TL")):
     print(f"DEBUG: Endpoint called - selectedOption: {selectedOption}, TL: {TL}")
     user_leave_requests = get_only_user_leave_requests(selectedOption, TL) # Manager sees new requests
