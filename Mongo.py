@@ -6586,3 +6586,342 @@ async def notify_task_stakeholders(task_data, action, **kwargs):
     except Exception as e:
         print(f"Error notifying task stakeholders: {e}")
         return []
+
+# ======================== CHAT NOTIFICATION FUNCTIONS ========================
+
+async def create_chat_message_notification(sender_id, receiver_id, sender_name, message_preview, chat_type="direct"):
+    """
+    Create notification when a new chat message is received
+    
+    Args:
+        sender_id: ID of the user sending the message
+        receiver_id: ID of the user receiving the message
+        sender_name: Name of the sender
+        message_preview: Preview of the message (first 50 chars)
+        chat_type: Type of chat - 'direct' or 'group'
+    """
+    try:
+        print(f"💬 Creating chat notification from {sender_name} to user {receiver_id}")
+        
+        # Get receiver info
+        receiver = Users.find_one({"_id": ObjectId(receiver_id)}) if ObjectId.is_valid(receiver_id) else Users.find_one({"userid": receiver_id})
+        if not receiver:
+            print(f"⚠️ Receiver not found: {receiver_id}")
+            return None
+        
+        receiver_name = receiver.get("name", "User")
+        
+        # Truncate message preview
+        if len(message_preview) > 50:
+            message_preview = message_preview[:47] + "..."
+        
+        title = f"New Message from {sender_name}"
+        message = f"Hi {receiver_name}, {sender_name} sent you a message: '{message_preview}'"
+        
+        # Check for duplicate notifications (same sender and receiver within last 30 seconds)
+        thirty_seconds_ago = datetime.now(pytz.timezone("Asia/Kolkata")) - timedelta(seconds=30)
+        existing_notification = Notifications.find_one({
+            "userid": receiver_id,
+            "type": "chat",
+            "metadata.sender_id": sender_id,
+            "created_at": {"$gte": thirty_seconds_ago.isoformat()}
+        })
+        
+        if existing_notification:
+            print(f"⚠️ Recent chat notification already exists. Skipping duplicate.")
+            return str(existing_notification["_id"])
+        
+        # Create notification with WebSocket support
+        notification_id = await create_notification_with_websocket(
+            userid=receiver_id,
+            title=title,
+            message=message,
+            notification_type="chat",
+            priority="medium",
+            action_url="/User/Chat",  # Direct to chat page
+            related_id=sender_id,
+            metadata={
+                "sender_id": sender_id,
+                "sender_name": sender_name,
+                "message_preview": message_preview,
+                "chat_type": chat_type
+            }
+        )
+        
+        print(f"✅ Chat notification created: {notification_id}")
+        return notification_id
+        
+    except Exception as e:
+        print(f"❌ Error creating chat notification: {e}")
+        traceback.print_exc()
+        return None
+
+async def create_group_chat_notification(sender_id, group_id, sender_name, group_name, message_preview, member_ids):
+    """
+    Create notifications for all group members when a new message is sent
+    
+    Args:
+        sender_id: ID of the user sending the message
+        group_id: ID of the group
+        sender_name: Name of the sender
+        group_name: Name of the group
+        message_preview: Preview of the message
+        member_ids: List of group member IDs (excluding sender)
+    """
+    try:
+        print(f"💬 Creating group chat notifications for group: {group_name}")
+        
+        notifications_sent = []
+        
+        # Truncate message preview
+        if len(message_preview) > 50:
+            message_preview = message_preview[:47] + "..."
+        
+        for member_id in member_ids:
+            # Don't send notification to the sender
+            if member_id == sender_id:
+                continue
+            
+            # Get member info
+            member = Users.find_one({"_id": ObjectId(member_id)}) if ObjectId.is_valid(member_id) else Users.find_one({"userid": member_id})
+            if not member:
+                continue
+            
+            member_name = member.get("name", "User")
+            
+            title = f"New Message in {group_name}"
+            message = f"Hi {member_name}, {sender_name} posted in {group_name}: '{message_preview}'"
+            
+            # Create notification with WebSocket support
+            notification_id = await create_notification_with_websocket(
+                userid=member_id,
+                title=title,
+                message=message,
+                notification_type="chat",
+                priority="low",
+                action_url="/User/Chat",
+                related_id=group_id,
+                metadata={
+                    "sender_id": sender_id,
+                    "sender_name": sender_name,
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "message_preview": message_preview,
+                    "chat_type": "group"
+                }
+            )
+            
+            notifications_sent.append(notification_id)
+        
+        print(f"✅ Group chat notifications sent to {len(notifications_sent)} members")
+        return notifications_sent
+        
+    except Exception as e:
+        print(f"❌ Error creating group chat notifications: {e}")
+        traceback.print_exc()
+        return []
+
+# ======================== DOCUMENT REVIEW NOTIFICATION FUNCTIONS ========================
+
+async def create_document_assignment_notification(userid, doc_name, assigned_by_name, assigned_by_id=None):
+    """
+    Create notification when a document is assigned to a user
+    
+    Args:
+        userid: ID of the user receiving the document
+        doc_name: Name of the document
+        assigned_by_name: Name of the person assigning the document
+        assigned_by_id: ID of the person assigning (optional)
+    """
+    try:
+        print(f"📄 Creating document assignment notification for user {userid}: {doc_name}")
+        
+        # Get user info
+        user = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else Users.find_one({"userid": userid})
+        if not user:
+            print(f"⚠️ User not found: {userid}")
+            return None
+        
+        user_name = user.get("name", "User")
+        
+        title = f"New Document Assigned"
+        message = f"Hi {user_name}, '{doc_name}' has been assigned to you by {assigned_by_name}. Please review and upload the required documentation."
+        
+        # Check for duplicate notifications
+        one_minute_ago = datetime.now(pytz.timezone("Asia/Kolkata")) - timedelta(minutes=1)
+        existing_notification = Notifications.find_one({
+            "userid": userid,
+            "type": "document",
+            "metadata.doc_name": doc_name,
+            "metadata.action": "assigned",
+            "created_at": {"$gte": one_minute_ago.isoformat()}
+        })
+        
+        if existing_notification:
+            print(f"⚠️ Duplicate document assignment notification detected. Skipping.")
+            return str(existing_notification["_id"])
+        
+        # Create notification with WebSocket support
+        notification_id = await create_notification_with_websocket(
+            userid=userid,
+            title=title,
+            message=message,
+            notification_type="document",
+            priority="high",
+            action_url="/User/OnboardingDocs",
+            related_id=assigned_by_id,
+            metadata={
+                "doc_name": doc_name,
+                "assigned_by_name": assigned_by_name,
+                "assigned_by_id": assigned_by_id,
+                "action": "assigned"
+            }
+        )
+        
+        print(f"✅ Document assignment notification created: {notification_id}")
+        return notification_id
+        
+    except Exception as e:
+        print(f"❌ Error creating document assignment notification: {e}")
+        traceback.print_exc()
+        return None
+
+async def create_document_upload_notification(userid, doc_name, uploaded_by_name, uploaded_by_id, reviewer_ids=None):
+    """
+    Create notification when a document is uploaded for review
+    
+    Args:
+        userid: ID of the user who uploaded the document
+        doc_name: Name of the document
+        uploaded_by_name: Name of the person who uploaded
+        uploaded_by_id: ID of the person who uploaded
+        reviewer_ids: List of IDs who should review (HR, Manager, etc.)
+    """
+    try:
+        print(f"📤 Creating document upload notification: {doc_name} by {uploaded_by_name}")
+        
+        notifications_sent = []
+        
+        # Get reviewer IDs if not provided
+        if not reviewer_ids:
+            reviewer_ids = []
+            
+            # Get HR users
+            hr_users = list(Users.find({"department": {"$regex": "^HR$", "$options": "i"}}))
+            reviewer_ids.extend([str(hr["_id"]) for hr in hr_users])
+            
+            # Get user's manager
+            user = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else Users.find_one({"userid": userid})
+            if user and user.get("manager_id"):
+                reviewer_ids.append(user["manager_id"])
+        
+        # Remove duplicates and the uploader
+        reviewer_ids = list(set(reviewer_ids))
+        if uploaded_by_id in reviewer_ids:
+            reviewer_ids.remove(uploaded_by_id)
+        
+        for reviewer_id in reviewer_ids:
+            # Get reviewer info
+            reviewer = Users.find_one({"_id": ObjectId(reviewer_id)}) if ObjectId.is_valid(reviewer_id) else Users.find_one({"userid": reviewer_id})
+            if not reviewer:
+                continue
+            
+            reviewer_name = reviewer.get("name", "Reviewer")
+            reviewer_position = reviewer.get("position", "")
+            
+            title = f"Document Uploaded for Review"
+            message = f"Hi {reviewer_name}, {uploaded_by_name} has uploaded '{doc_name}' for your review. Please verify and approve."
+            
+            # Create notification with WebSocket support
+            notification_id = await create_notification_with_websocket(
+                userid=reviewer_id,
+                title=title,
+                message=message,
+                notification_type="document",
+                priority="high",
+                action_url="/admin" if reviewer_position.lower() in ["hr", "admin"] else "/Manager/OnboardingDocs",
+                related_id=uploaded_by_id,
+                metadata={
+                    "doc_name": doc_name,
+                    "uploaded_by_name": uploaded_by_name,
+                    "uploaded_by_id": uploaded_by_id,
+                    "action": "uploaded"
+                }
+            )
+            
+            notifications_sent.append(notification_id)
+        
+        print(f"✅ Document upload notifications sent to {len(notifications_sent)} reviewers")
+        return notifications_sent
+        
+    except Exception as e:
+        print(f"❌ Error creating document upload notifications: {e}")
+        traceback.print_exc()
+        return []
+
+async def create_document_review_notification(userid, doc_name, reviewer_name, reviewer_id, status, remarks=None):
+    """
+    Create notification when a document is reviewed (approved/rejected)
+    
+    Args:
+        userid: ID of the user who uploaded the document
+        doc_name: Name of the document
+        reviewer_name: Name of the reviewer
+        reviewer_id: ID of the reviewer
+        status: Status of the review (Verified, Rejected, etc.)
+        remarks: Optional remarks from reviewer
+    """
+    try:
+        print(f"📋 Creating document review notification for user {userid}: {doc_name} - {status}")
+        
+        # Get user info
+        user = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else Users.find_one({"userid": userid})
+        if not user:
+            print(f"⚠️ User not found: {userid}")
+            return None
+        
+        user_name = user.get("name", "User")
+        
+        # Set title and message based on status
+        if status.lower() == "verified":
+            title = f"Document Approved ✅"
+            message = f"Hi {user_name}, your document '{doc_name}' has been approved by {reviewer_name}."
+            priority = "medium"
+        elif status.lower() == "rejected":
+            title = f"Document Rejected ❌"
+            message = f"Hi {user_name}, your document '{doc_name}' has been rejected by {reviewer_name}."
+            priority = "high"
+        else:
+            title = f"Document Review Update"
+            message = f"Hi {user_name}, your document '{doc_name}' has been reviewed by {reviewer_name}. Status: {status}"
+            priority = "medium"
+        
+        if remarks:
+            message += f" Remarks: {remarks}"
+        
+        # Create notification with WebSocket support
+        notification_id = await create_notification_with_websocket(
+            userid=userid,
+            title=title,
+            message=message,
+            notification_type="document",
+            priority=priority,
+            action_url="/User/OnboardingDocs",
+            related_id=reviewer_id,
+            metadata={
+                "doc_name": doc_name,
+                "reviewer_name": reviewer_name,
+                "reviewer_id": reviewer_id,
+                "status": status,
+                "remarks": remarks,
+                "action": "reviewed"
+            }
+        )
+        
+        print(f"✅ Document review notification created: {notification_id}")
+        return notification_id
+        
+    except Exception as e:
+        print(f"❌ Error creating document review notification: {e}")
+        traceback.print_exc()
+        return None

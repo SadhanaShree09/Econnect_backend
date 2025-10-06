@@ -4007,6 +4007,24 @@ async def websocket_endpoint(websocket: WebSocket, userid: str):
 
                 # send to both sender and recipient
                 await direct_chat_manager.send_message(msg["to_user"], msg)
+                
+                # Create chat notification for receiver
+                try:
+                    sender = Users.find_one({"userid": userid})
+                    sender_name = sender.get("name", "Unknown User") if sender else "Unknown User"
+                    message_text = msg.get("text", "")
+                    
+                    # Only send notification for text messages (not for reactions, etc.)
+                    if message_text:
+                        await Mongo.create_chat_message_notification(
+                            sender_id=userid,
+                            receiver_id=msg["to_user"],
+                            sender_name=sender_name,
+                            message_preview=message_text,
+                            chat_type="direct"
+                        )
+                except Exception as e:
+                    print(f"Error creating chat notification: {e}")
 
     except WebSocketDisconnect:
         direct_chat_manager.disconnect(userid, websocket)
@@ -4063,7 +4081,7 @@ async def get_threads(rootId: str):
 
 # ------------------ Assign Document ------------------
 @app.post("/assign_docs")
-def assign_docs(payload: AssignPayload, assigned_by: str = "HR"):
+async def assign_docs(payload: AssignPayload, assigned_by: str = "HR"):
     if not payload.userIds or not payload.docName:
         raise HTTPException(status_code=400, detail="docName and userIds required")
     
@@ -4085,6 +4103,17 @@ def assign_docs(payload: AssignPayload, assigned_by: str = "HR"):
         )
         if result.modified_count > 0:
             count += 1
+            
+            # Send notification to user about document assignment
+            try:
+                await Mongo.create_document_assignment_notification(
+                    userid=uid,
+                    doc_name=payload.docName,
+                    assigned_by_name=assigned_by,
+                    assigned_by_id=None  # Can be enhanced to get actual assigner ID
+                )
+            except Exception as e:
+                print(f"Error sending document assignment notification: {e}")
 
     return {"message": f'"{payload.docName}" assigned to {count} user(s)'}
 @app.get("/assign_docs")
@@ -4128,7 +4157,7 @@ def fetch_assigned_docs(userId: str):
 
 # ------------------ Review Document ------------------
 @app.put("/review_document")
-def review_document(payload: ReviewPayload):
+async def review_document(payload: ReviewPayload):
     result = Users.update_one(
         {"userid": payload.userId, "assigned_docs.docName": payload.docName},
         {"$set": {
@@ -4139,6 +4168,24 @@ def review_document(payload: ReviewPayload):
     )
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Document assignment not found")
+    
+    # Send notification to user about document review
+    try:
+        # Get reviewer info (assuming it's from the request or session)
+        # For now, we'll use a placeholder - you can enhance this to get actual reviewer info
+        reviewer_name = payload.remarks or "Reviewer"  # This should be enhanced
+        
+        await Mongo.create_document_review_notification(
+            userid=payload.userId,
+            doc_name=payload.docName,
+            reviewer_name="Document Reviewer",  # Should get actual reviewer name
+            reviewer_id=None,  # Should get actual reviewer ID
+            status=payload.status,
+            remarks=payload.remarks
+        )
+    except Exception as e:
+        print(f"Error sending document review notification: {e}")
+    
     return {"message": f"Document {payload.docName} marked as {payload.status}"}
 
 
@@ -4224,6 +4271,23 @@ async def upload_document(
                     }
                 }}
             )
+        
+        # Send notification about document upload to reviewers
+        try:
+            # Get user info
+            user = Users.find_one({"userid": userid})
+            user_name = user.get("name", "User") if user else "User"
+            
+            # Send notification to HR and manager
+            await Mongo.create_document_upload_notification(
+                userid=userid,
+                doc_name=docName,
+                uploaded_by_name=user_name,
+                uploaded_by_id=userid,
+                reviewer_ids=None  # Will auto-detect HR and manager
+            )
+        except Exception as e:
+            print(f"Error sending document upload notification: {e}")
 
         return {"message": "File uploaded successfully", "file_id": file_id}
 
@@ -4379,6 +4443,34 @@ async def websocket_group(websocket: WebSocket, group_id: str):
 
             # Broadcast to all group members
             await group_ws_manager.broadcast(group_id, data)
+            
+            # Create group chat notifications
+            try:
+                sender_id = data.get("from_user")
+                message_text = data.get("text", "")
+                
+                # Get group info
+                group = groups_collection.find_one({"_id": group_id})
+                if group and message_text:
+                    group_name = group.get("name", "Group")
+                    member_ids = group.get("members", [])
+                    
+                    # Get sender name
+                    sender = Users.find_one({"userid": sender_id})
+                    sender_name = sender.get("name", "Unknown User") if sender else "Unknown User"
+                    
+                    # Send notifications to all members except sender
+                    await Mongo.create_group_chat_notification(
+                        sender_id=sender_id,
+                        group_id=group_id,
+                        sender_name=sender_name,
+                        group_name=group_name,
+                        message_preview=message_text,
+                        member_ids=member_ids
+                    )
+            except Exception as e:
+                print(f"Error creating group chat notification: {e}")
+                
     except Exception as e:
         print("WS disconnected", e)
     finally:
