@@ -6795,7 +6795,7 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
         doc_name: Name of the document
         uploaded_by_name: Name of the person who uploaded
         uploaded_by_id: ID of the person who uploaded
-        reviewer_ids: List of IDs who should review (HR, Manager, etc.)
+        reviewer_ids: List of IDs who should review (Admins only)
     """
     try:
         print(f"📤 Creating document upload notification: {doc_name} by {uploaded_by_name}")
@@ -6806,14 +6806,9 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
         if not reviewer_ids:
             reviewer_ids = []
             
-            # Get HR users
-            hr_users = list(Users.find({"department": {"$regex": "^HR$", "$options": "i"}}))
-            reviewer_ids.extend([str(hr["_id"]) for hr in hr_users])
-            
-            # Get user's manager
-            user = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else Users.find_one({"userid": userid})
-            if user and user.get("manager_id"):
-                reviewer_ids.append(user["manager_id"])
+            # Get Admin users only (not HR, as only admins can review/verify docs in the admin UI)
+            admin_users = list(Users.find({"isadmin": True}))
+            reviewer_ids.extend([str(admin["_id"]) for admin in admin_users])
         
         # Remove duplicates and the uploader
         reviewer_ids = list(set(reviewer_ids))
@@ -6832,14 +6827,14 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
             title = f"Document Uploaded for Review"
             message = f"Hi {reviewer_name}, {uploaded_by_name} has uploaded '{doc_name}' for your review. Please verify and approve."
             
-            # Create notification with WebSocket support
+            # Create notification with WebSocket support (all admins go to /admin)
             notification_id = await create_notification_with_websocket(
                 userid=reviewer_id,
                 title=title,
                 message=message,
                 notification_type="document",
                 priority="high",
-                action_url="/admin" if reviewer_position.lower() in ["hr", "admin"] else "/Manager/review-docs",
+                action_url="/admin/review-docs",
                 related_id=uploaded_by_id,
                 metadata={
                     "doc_name": doc_name,
