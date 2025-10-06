@@ -6745,7 +6745,7 @@ async def create_document_assignment_notification(userid, doc_name, assigned_by_
         user_name = user.get("name", "User")
         
         title = f"New Document Assigned"
-        message = f"Hi {user_name}, '{doc_name}' has been assigned to you by {assigned_by_name}. Please review and upload the required documentation."
+        message = f"Hi {user_name}, '{doc_name}' has been assigned to you by Admin. Please review and upload the required documentation."
         
         # Check for duplicate notifications
         one_minute_ago = datetime.now(pytz.timezone("Asia/Kolkata")) - timedelta(minutes=1)
@@ -6772,7 +6772,7 @@ async def create_document_assignment_notification(userid, doc_name, assigned_by_
             related_id=assigned_by_id,
             metadata={
                 "doc_name": doc_name,
-                "assigned_by_name": assigned_by_name,
+                "assigned_by_name": "Admin",
                 "assigned_by_id": assigned_by_id,
                 "action": "assigned"
             }
@@ -6880,15 +6880,15 @@ async def create_document_review_notification(userid, doc_name, reviewer_name, r
         # Set title and message based on status
         if status.lower() == "verified":
             title = f"Document Approved ✅"
-            message = f"Hi {user_name}, your document '{doc_name}' has been approved by {reviewer_name}."
+            message = f"Hi {user_name}, your document '{doc_name}' has been approved by Admin."
             priority = "medium"
         elif status.lower() == "rejected":
             title = f"Document Rejected ❌"
-            message = f"Hi {user_name}, your document '{doc_name}' has been rejected by {reviewer_name}."
+            message = f"Hi {user_name}, your document '{doc_name}' has been rejected by Admin."
             priority = "high"
         else:
             title = f"Document Review Update"
-            message = f"Hi {user_name}, your document '{doc_name}' has been reviewed by {reviewer_name}. Status: {status}"
+            message = f"Hi {user_name}, your document '{doc_name}' has been reviewed by Admin. Status: {status}"
             priority = "medium"
         
         if remarks:
@@ -6905,7 +6905,7 @@ async def create_document_review_notification(userid, doc_name, reviewer_name, r
             related_id=reviewer_id,
             metadata={
                 "doc_name": doc_name,
-                "reviewer_name": reviewer_name,
+                "reviewer_name": "Admin",
                 "reviewer_id": reviewer_id,
                 "status": status,
                 "remarks": remarks,
