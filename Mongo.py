@@ -1170,19 +1170,28 @@ def get_manager_leave_requests(selected_option):
     if selected_option == "Leave":
         leave_request = list(Leave.find({
             "leaveType": {"$in": ["Sick Leave", "Casual Leave", "Bonus Leave"]},
-            "status": {"$exists": False},
+            "$or": [
+                {"status": {"$exists": False}},
+                {"status": "Pending"}
+            ],
             "userid": {"$in": user_ids}
         }))
     elif selected_option == "LOP":
         leave_request = list(Leave.find({
             "leaveType": "Other Leave",
-            "status": {"$exists": False},
+            "$or": [
+                {"status": {"$exists": False}},
+                {"status": "Pending"}
+            ],
             "userid": {"$in": user_ids}
         }))
     elif selected_option == "Permission":
         leave_request = list(Leave.find({
             "leaveType": "Permission",
-            "status": {"$exists": False},
+            "$or": [
+                {"status": {"$exists": False}},
+                {"status": "Pending"}
+            ],
             "userid": {"$in": user_ids}
         }))
     else:
@@ -1359,20 +1368,28 @@ def get_only_user_leave_requests(selected_option,TL_name):
     if selected_option == "Leave":
         leave_request = list(Leave.find({
             "leaveType": {"$in": ["Sick Leave", "Casual Leave", "Bonus Leave"]},
-            "status": {"$exists":False},
+            "$or": [
+                {"status": {"$exists": False}},
+                {"status": "Pending"}
+            ],
             "userid": {"$in": user_ids}
         }))
-        print(leave_request)
     elif selected_option == "LOP":
         leave_request = list(Leave.find({
             "leaveType": "Other Leave",
-            "status": {"$exists":False},
+            "$or": [
+                {"status": {"$exists": False}},
+                {"status": "Pending"}
+            ],
             "userid": {"$in": user_ids}
         }))
     elif selected_option == "Permission":
         leave_request = list(Leave.find({
             "leaveType": "Permission",
-            "status": {"$exists":False},
+            "$or": [
+                {"status": {"$exists": False}},
+                {"status": "Pending"}
+            ],
             "userid": {"$in": user_ids}
         }))
     else:
