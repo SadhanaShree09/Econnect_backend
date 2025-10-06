@@ -968,8 +968,11 @@ def store_sunday_request(userid, employee_name, time, leave_type, selected_date,
 
 # Manger Page Leave Requests
 def get_user_leave_requests(selected_option):
+    print(f"DEBUG: get_user_leave_requests (HR) - selected_option: {selected_option}")
+    
     if selected_option == "Leave":
         leave_request = list(Leave.find({"leaveType": {"$in": ["Sick Leave", "Casual Leave", "Bonus Leave"]}, "status":"Recommend"}))
+        print(f"DEBUG: Found {len(leave_request)} recommended Leave requests")
     elif selected_option == "LOP":
         leave_request = list(Leave.find({"leaveType": "Other Leave", "status":"Recommend"}))
     elif selected_option == "Permission":
@@ -1165,17 +1168,25 @@ def get_manager_leave_requests(selected_option):
     # Get Manager + HR IDs
     managers_and_hr = list(Users.find({"position": {"$in": ["Manager", "HR"]}}))
     user_ids = [str(user["_id"]) for user in managers_and_hr]
+    
+    print(f"DEBUG: get_manager_leave_requests - selected_option: {selected_option}")
+    print(f"DEBUG: Found {len(managers_and_hr)} managers/HR users")
+    print(f"DEBUG: User IDs: {user_ids}")
 
 
     if selected_option == "Leave":
-        leave_request = list(Leave.find({
+        query = {
             "leaveType": {"$in": ["Sick Leave", "Casual Leave", "Bonus Leave"]},
             "$or": [
                 {"status": {"$exists": False}},
                 {"status": "Pending"}
             ],
             "userid": {"$in": user_ids}
-        }))
+        }
+        print(f"DEBUG: Query: {query}")
+        print(f"DEBUG: Query: {query}")
+        leave_request = list(Leave.find(query))
+        print(f"DEBUG: Found {len(leave_request)} leave requests")
     elif selected_option == "LOP":
         leave_request = list(Leave.find({
             "leaveType": "Other Leave",
@@ -1185,6 +1196,7 @@ def get_manager_leave_requests(selected_option):
             ],
             "userid": {"$in": user_ids}
         }))
+        print(f"DEBUG: Found {len(leave_request)} LOP requests")
     elif selected_option == "Permission":
         leave_request = list(Leave.find({
             "leaveType": "Permission",
@@ -1194,8 +1206,10 @@ def get_manager_leave_requests(selected_option):
             ],
             "userid": {"$in": user_ids}
         }))
+        print(f"DEBUG: Found {len(leave_request)} Permission requests")
     else:
         leave_request = []
+        print(f"DEBUG: Invalid selected_option: {selected_option}")
     
     # Process the results
     for index, leave in enumerate(leave_request):
@@ -1364,16 +1378,25 @@ def get_only_user_leave_requests(selected_option,TL_name):
      
     # Prepare a list of user IDs
     user_ids = [str(user["_id"]) for user in users]
+    
+    print(f"DEBUG: get_only_user_leave_requests - TL_name: {TL_name}")
+    print(f"DEBUG: Found {len(users)} users under this TL")
+    print(f"DEBUG: User IDs: {user_ids}")
 
     if selected_option == "Leave":
-        leave_request = list(Leave.find({
+        query = {
             "leaveType": {"$in": ["Sick Leave", "Casual Leave", "Bonus Leave"]},
             "$or": [
                 {"status": {"$exists": False}},
                 {"status": "Pending"}
             ],
             "userid": {"$in": user_ids}
-        }))
+        }
+        print(f"DEBUG: Query for Leave: {query}")
+        leave_request = list(Leave.find(query))
+        print(f"DEBUG: Found {len(leave_request)} leave requests")
+        if leave_request:
+            print(f"DEBUG: Sample leave request: {leave_request[0]}")
     elif selected_option == "LOP":
         leave_request = list(Leave.find({
             "leaveType": "Other Leave",
@@ -1383,6 +1406,7 @@ def get_only_user_leave_requests(selected_option,TL_name):
             ],
             "userid": {"$in": user_ids}
         }))
+        print(f"DEBUG: Found {len(leave_request)} LOP requests")
     elif selected_option == "Permission":
         leave_request = list(Leave.find({
             "leaveType": "Permission",
@@ -1392,8 +1416,10 @@ def get_only_user_leave_requests(selected_option,TL_name):
             ],
             "userid": {"$in": user_ids}
         }))
+        print(f"DEBUG: Found {len(leave_request)} Permission requests")
     else:
         leave_request = []
+        print(f"DEBUG: Invalid selected_option: {selected_option}")
     
     # Clean the IDs for each leave request
     for index, leave in enumerate(leave_request):

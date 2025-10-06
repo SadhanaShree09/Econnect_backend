@@ -932,7 +932,9 @@ async def get_leave_History(userid: str = Path(..., title="The userid of the use
 # HR endpoint - Uses get_user_leave_requests
 @app.get("/all_users_leave_requests/")
 async def fetch_user_leave_requests(selectedOption: str = Query(..., alias="selectedOption")):
+    print(f"DEBUG: /all_users_leave_requests endpoint called - selectedOption: {selectedOption}")
     user_leave_requests = get_user_leave_requests(selectedOption) # HR sees recommended
+    print(f"DEBUG: Returning {len(user_leave_requests) if user_leave_requests else 0} requests")
     return {"user_leave_requests": user_leave_requests or []}
 
 # Admin Page To Fetch Only Managers Leave Requests 
@@ -958,13 +960,17 @@ async def fetch_user_leave_requests(selectedOption: str = Query(..., alias="sele
 # Admin Page To Fetch Only Managers Leave Requests
 @app.get("/manager_leave_requests/")
 async def fetch_manager_leave_requests(selectedOption: str = Query(..., alias="selectedOption")):
+    print(f"DEBUG: /manager_leave_requests endpoint called - selectedOption: {selectedOption}")
     user_leave_requests = get_manager_leave_requests(selectedOption) # Admin sees manager requests
+    print(f"DEBUG: Returning {len(user_leave_requests) if user_leave_requests else 0} requests")
     return {"user_leave_requests": user_leave_requests or []}
 
 #TL,Manager Page To Fetch Only Users Leave Requests Under Their Team
 @app.get("/only_users_leave_requests/")
 async def fetch_users_leave_requests(selectedOption: str = Query(..., alias="selectedOption"), TL: str = Query(..., alias="TL")):
+    print(f"DEBUG: Endpoint called - selectedOption: {selectedOption}, TL: {TL}")
     user_leave_requests = get_only_user_leave_requests(selectedOption, TL) # Manager sees new requests
+    print(f"DEBUG: Returning {len(user_leave_requests) if user_leave_requests else 0} requests")
     return {"user_leave_requests": user_leave_requests or []}
 
 #HR page
