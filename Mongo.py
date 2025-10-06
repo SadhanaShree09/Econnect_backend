@@ -6839,7 +6839,7 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
                 message=message,
                 notification_type="document",
                 priority="high",
-                action_url="/admin" if reviewer_position.lower() in ["hr", "admin"] else "/Manager/OnboardingDocs",
+                action_url="/admin" if reviewer_position.lower() in ["hr", "admin"] else "/Manager/review-docs",
                 related_id=uploaded_by_id,
                 metadata={
                     "doc_name": doc_name,
