@@ -195,22 +195,32 @@ origins = ["https://econnect-frontend-wheat.vercel.app", "http://localhost:5173"
 #     "*"    # Allow all origins for development
 # ]
 
-# Add security headers only, no redirects
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    return response
-
+# Add CORS middleware FIRST (order matters!)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# Add security headers after CORS
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        return response
+    except Exception as e:
+        # Ensure CORS headers are present even on errors
+        print(f"Error in middleware: {str(e)}")
+        return JSONResponse(
+            content={"error": "Internal server error", "details": str(e)},
+            status_code=500
+        )
 
 class ConnectionManager:
     def __init__(self):
@@ -2859,29 +2869,44 @@ def get_user(userid: str):
     try:
         obj_id = ObjectId(userid)
     except Exception as e:
-        return JSONResponse(content={"error": f"Invalid ID format: {str(e)}", "userid": userid})
+        print(f"Invalid ObjectId format: {str(e)}")
+        return JSONResponse(
+            content={"error": f"Invalid ID format: {str(e)}", "userid": userid},
+            status_code=400
+        )
 
-    # First, try to find in Users collection
-    user = Users.find_one({"_id": obj_id}, {"password": 0})
+    try:
+        # First, try to find in Users collection
+        user = Users.find_one({"_id": obj_id}, {"password": 0})
+        
+        if user:
+            # Convert ObjectId to string for JSON
+            user["_id"] = str(user["_id"])
+            print(f"User found in Users collection: {user.get('email')}")
+            return JSONResponse(content=user, status_code=200)
+        
+        # If not found in Users, check admin collection
+        admin_user = admin.find_one({"_id": obj_id}, {"password": 0})
+        
+        if admin_user:
+            # Convert ObjectId to string for JSON
+            admin_user["_id"] = str(admin_user["_id"])
+            print(f"User found in admin collection: {admin_user.get('email')}")
+            return JSONResponse(content=admin_user, status_code=200)
+        
+        # User not found in either collection
+        print("User not found in any collection!")
+        return JSONResponse(
+            content={"error": "User not found", "userid": userid},
+            status_code=404
+        )
     
-    if user:
-        # Convert ObjectId to string for JSON
-        user["_id"] = str(user["_id"])
-        print(f"User found in Users collection: {user.get('email')}")
-        return JSONResponse(content=user)
-    
-    # If not found in Users, check admin collection
-    admin_user = admin.find_one({"_id": obj_id}, {"password": 0})
-    
-    if admin_user:
-        # Convert ObjectId to string for JSON
-        admin_user["_id"] = str(admin_user["_id"])
-        print(f"User found in admin collection: {admin_user.get('email')}")
-        return JSONResponse(content=admin_user)
-    
-    # User not found in either collection
-    print("User not found in any collection!")
-    return JSONResponse(content={"error": "User not found", "userid": userid})
+    except Exception as e:
+        print(f"Database error in get_user: {str(e)}")
+        return JSONResponse(
+            content={"error": "Internal server error", "details": str(e)},
+            status_code=500
+        )
 
 
 # @app.put("/edit_employee")
