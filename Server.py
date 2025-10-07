@@ -2852,45 +2852,36 @@ async def get_task_file(taskid: str, fileid: str):
     except Exception:
         raise HTTPException(status_code=404, detail="File not found in GridFS")
 
-# @app.get("/get_user/{userid}")
-# def get_user(userid: str):
-#     result = get_user_info(userid)
-#     if result:
-#         return result
-#     return {"error": "User not found", "userid": userid}
-
 @app.get("/get_user/{userid}")
 def get_user(userid: str):
-    try:
-        result = Users.find_one({"_id": ObjectId(userid)}, {"_id": 0, "password": 0})
-        if result:
-            return result
-        else:
-            return {"error": "User not found", "userid": userid}
-    except Exception as e:
-        return {"error": f"Invalid ID format: {str(e)}", "userid": userid}
-
-@app.get("/get_user/{userid}")
-def get_user(userid: str):
-    print("Searching user ID:", userid, "in collection:", Users.name)
-
+    print("Searching user ID:", userid)
 
     try:
         obj_id = ObjectId(userid)
     except Exception as e:
         return JSONResponse(content={"error": f"Invalid ID format: {str(e)}", "userid": userid})
 
-
+    # First, try to find in Users collection
     user = Users.find_one({"_id": obj_id}, {"password": 0})
-
-
+    
     if user:
         # Convert ObjectId to string for JSON
         user["_id"] = str(user["_id"])
+        print(f"User found in Users collection: {user.get('email')}")
         return JSONResponse(content=user)
-    else:
-        print("User not found in collection!")
-        return JSONResponse(content={"error": "User not found", "userid": userid})
+    
+    # If not found in Users, check admin collection
+    admin_user = admin.find_one({"_id": obj_id}, {"password": 0})
+    
+    if admin_user:
+        # Convert ObjectId to string for JSON
+        admin_user["_id"] = str(admin_user["_id"])
+        print(f"User found in admin collection: {admin_user.get('email')}")
+        return JSONResponse(content=admin_user)
+    
+    # User not found in either collection
+    print("User not found in any collection!")
+    return JSONResponse(content={"error": "User not found", "userid": userid})
 
 
 # @app.put("/edit_employee")

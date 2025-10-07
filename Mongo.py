@@ -3296,7 +3296,7 @@ def edit_an_employee(employee_data):
         employee_data['education'] = clean_education
         employee_data['skills'] = clean_skills
         
-        # Find and update the employee
+        # First, try to find and update in Users collection by userid
         result = Users.find_one_and_update(
             {"userid": employee_data["userid"]},
             {"$set": employee_data},
@@ -3305,21 +3305,37 @@ def edit_an_employee(employee_data):
         
         if result:
             return {"message": "Employee details updated successfully"}
-        else:
-            # Try updating by ObjectId if userid doesn't work
-            try:
-                obj_id = ObjectId(employee_data["userid"])
-                result = Users.find_one_and_update(
-                    {"_id": obj_id},
-                    {"$set": employee_data},
-                    return_document=True
-                )
-                if result:
-                    return {"message": "Employee details updated successfully"}
-                else:
-                    raise HTTPException(status_code=404, detail="Employee not found")
-            except:
-                raise HTTPException(status_code=404, detail="Employee not found")
+        
+        # Try updating by ObjectId in Users collection
+        try:
+            obj_id = ObjectId(employee_data["userid"])
+            result = Users.find_one_and_update(
+                {"_id": obj_id},
+                {"$set": employee_data},
+                return_document=True
+            )
+            if result:
+                return {"message": "Employee details updated successfully"}
+        except:
+            pass
+        
+        # If not found in Users, try admin collection
+        try:
+            obj_id = ObjectId(employee_data["userid"])
+            result = admin.find_one_and_update(
+                {"_id": obj_id},
+                {"$set": employee_data},
+                return_document=True
+            )
+            if result:
+                return {"message": "Admin details updated successfully"}
+            else:
+                raise HTTPException(status_code=404, detail="Employee not found in any collection")
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Error updating admin: {str(e)}")
+            raise HTTPException(status_code=404, detail="Employee not found")
                 
     except HTTPException:
         raise
