@@ -2010,8 +2010,14 @@ def Permission_History_Details(userid):
 def get_all_users():
         # Fetch all users from the Users collection
         users = list(Users.find({}, {"password": 0}))  # Exclude the password field
+        
+        # Also fetch admins from the admin collection
+        admins = list(admin.find({}, {"password": 0}))  # Exclude the password field
+        
         # Prepare a list of users with only name, email, and id
         user_list = []
+        
+        # Add regular users
         for user in users:
             user_data = {
                 "id": str(user["_id"]),  # Convert ObjectId to string
@@ -2020,8 +2026,23 @@ def get_all_users():
                 "department": user.get("department"),
                 "position": user.get("position"),
                 "status": user.get("status"),
+                "isadmin": user.get("isadmin", False),  # Include isadmin flag
             }
             user_list.append(user_data)
+        
+        # Add admins from admin collection
+        for admin_user in admins:
+            admin_data = {
+                "id": str(admin_user["_id"]),  # Convert ObjectId to string
+                "email": admin_user.get("email"),
+                "name": admin_user.get("name"),
+                "department": admin_user.get("department"),
+                "position": admin_user.get("position"),
+                "status": admin_user.get("status"),
+                "isadmin": True,  # Always true for users in admin collection
+            }
+            user_list.append(admin_data)
+        
         return user_list
 
 def get_admin_info(email):
