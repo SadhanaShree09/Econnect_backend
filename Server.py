@@ -4133,7 +4133,23 @@ def get_assigned_docs(userId: str = Query(...)):
 # ------------------ Fetch Assigned Documents ------------------
 @app.get("/documents/assigned/{userId}")
 def fetch_assigned_docs(userId: str):
+    # First try to find user in Users collection
     user = Users.find_one({"userid": userId})
+    
+    # If not found, try with ObjectId format
+    if not user:
+        try:
+            user = Users.find_one({"_id": ObjectId(userId)})
+        except:
+            pass
+    
+    # If still not found, check admin collection
+    if not user:
+        try:
+            user = admin.find_one({"_id": ObjectId(userId)})
+        except:
+            pass
+    
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     

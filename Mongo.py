@@ -3111,9 +3111,19 @@ def get_assigned_tasks(manager_name: str, userid: str = None):
 #     result = Users.find_one({"_id": ObjectId(userid)}, {"_id": 0, "password": 0})
 #     return result
 
-def get_user_info(userid):
+def get_user_info(userid, check_admin=True):
+    """
+    Get user information from appropriate collection.
+    
+    Args:
+        userid: User ID to search for
+        check_admin: If True, also checks admin collection (for admin users)
+                    If False, only checks Users collection (for regular employees)
+    
+    Returns:
+        User data dict or error dict
+    """
     print("Connected DB:", db.name)
-    print("Collection:", Users.name)
     print("Searching for user ID:", userid)
     
     try:
@@ -3121,13 +3131,41 @@ def get_user_info(userid):
     except Exception as e:
         return {"error": f"Invalid ID format: {str(e)}", "userid": userid}
 
+    # Always check Users collection first (for employees and admins who might be in both)
     result = Users.find_one({"_id": obj_id}, {"password": 0})
+    
     if result:
-        result["_id"] = str(result["_id"])  # JSON safe
+        print("User found in Users collection")
+        result["_id"] = str(result["_id"])
+        # Ensure isadmin is set correctly
+        if "isadmin" not in result:
+            result["isadmin"] = False
         return result
-    else:
-        print("User not found in collection")
-        return {"error": "User not found", "userid": userid}
+    
+    # If check_admin is True and not found in Users, check admin collection
+    if check_admin:
+        print("Not found in Users collection, checking admin collection...")
+        result = admin.find_one({"_id": obj_id}, {"password": 0})
+        
+        if result:
+            print("Admin found in admin collection")
+            result["_id"] = str(result["_id"])
+            result["isadmin"] = True  # Always true for admin collection
+            return result
+    
+    # Not found in any checked collection
+    print("User not found in any collection")
+    return {"error": "User not found", "userid": userid}
+    
+    if result:
+        print("Admin found in admin collection")
+        result["_id"] = str(result["_id"])
+        result["isadmin"] = True  # Always true for admin collection
+        return result
+    
+    # Not found in either collection
+    print("User not found in any collection")
+    return {"error": "User not found", "userid": userid}
 
 
 def get_admin_information(userid):
@@ -3139,7 +3177,18 @@ def get_admin_information(userid):
     except Exception as e:
         return {"error": f"Invalid ID format: {str(e)}", "userid": userid}
 
+    # First check Users collection
     result = Users.find_one({"_id": obj_id}, {"password": 0})
+    
+    # If not found in Users, check admin collection
+    if not result:
+        print("Admin not found in Users collection, checking admin collection...")
+        result = admin.find_one({"_id": obj_id}, {"password": 0})
+        if result:
+            print("Admin found in admin collection")
+            # Add isadmin flag if from admin collection
+            result["isadmin"] = True
+    
     if result:
         result["_id"] = str(result["_id"])  # JSON safe
         return result
