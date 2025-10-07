@@ -126,13 +126,11 @@ def CheckPassword(password,pwd_hash):
     return check
     
 def Signup(email,password,name):
-    check_old_user=Users.find_one({'email':email})
-    if check_old_user:
-        raise HTTPException(status_code=300, detail="Email already Exists")
-    else:
-        Haspass=Hashpassword(password)
-        a=Users.insert_one({'email':email,'password':Haspass,'name':name })
-        return signJWT(email, "user")
+    # MODIFIED: Disable self-registration - users must be added by admin
+    raise HTTPException(
+        status_code=403, 
+        detail="Self-registration is disabled. Please contact the administrator to create your account."
+    )
 
 def cleanid(data):
     obid=data.get('_id')
@@ -228,20 +226,11 @@ def Gsignin(client_name, email):
         result = manager_Gsignin(checkmanager, client_name)
         return result
     else:
-        # Auto-create a new user if email doesn't exist
-        new_user = {
-            "name": client_name,
-            "email": email,
-            "isadmin": False,
-            "isloggedin": True,
-            "created_at": selected_date,
-        }
-        inserted_id = Users.insert_one(new_user).inserted_id
-        user_doc = Users.find_one({"_id": inserted_id})
-        user_doc = cleanid(user_doc)
-        jwt_token = signJWT(client_name)
-        user_doc.update(jwt_token)
-        return user_doc
+        # MODIFIED: No auto-creation - user must be added by admin first
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied. Your account has not been authorized. Please contact the administrator to add you to the system."
+        )
 
 
 # UserID
