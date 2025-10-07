@@ -188,6 +188,44 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 import atexit
 
+# Utility function to serialize MongoDB documents to JSON
+def serialize_mongo_doc(doc):
+    """
+    Convert MongoDB document to JSON-serializable format.
+    Handles ObjectId, datetime, date, and nested structures.
+    """
+    if not doc:
+        return None
+    
+    if isinstance(doc, list):
+        return [serialize_mongo_doc(item) for item in doc]
+    
+    if not isinstance(doc, dict):
+        if isinstance(doc, ObjectId):
+            return str(doc)
+        elif isinstance(doc, (datetime, date)):
+            return doc.isoformat()
+        return doc
+    
+    # Convert ObjectId and datetime fields to strings
+    serialized = {}
+    for key, value in doc.items():
+        if isinstance(value, ObjectId):
+            serialized[key] = str(value)
+        elif isinstance(value, datetime):
+            serialized[key] = value.isoformat()
+        elif isinstance(value, date):
+            serialized[key] = value.isoformat()
+        elif isinstance(value, list):
+            # Handle lists that might contain ObjectIds, datetimes, or dicts
+            serialized[key] = [serialize_mongo_doc(item) for item in value]
+        elif isinstance(value, dict):
+            # Recursively handle nested dictionaries
+            serialized[key] = serialize_mongo_doc(value)
+        else:
+            serialized[key] = value
+    
+    return serialized
 
 app = FastAPI()
 origins = ["https://econnect-frontend-wheat.vercel.app", "http://localhost:5173", "http://localhost:5174"]
@@ -2880,8 +2918,7 @@ def get_user(userid: str):
         user = Users.find_one({"_id": obj_id}, {"password": 0})
         
         if user:
-            # Convert ObjectId to string for JSON
-            user["_id"] = str(user["_id"])
+            user = serialize_mongo_doc(user)
             print(f"User found in Users collection: {user.get('email')}")
             return JSONResponse(content=user, status_code=200)
         
@@ -2889,8 +2926,7 @@ def get_user(userid: str):
         admin_user = admin.find_one({"_id": obj_id}, {"password": 0})
         
         if admin_user:
-            # Convert ObjectId to string for JSON
-            admin_user["_id"] = str(admin_user["_id"])
+            admin_user = serialize_mongo_doc(admin_user)
             print(f"User found in admin collection: {admin_user.get('email')}")
             return JSONResponse(content=admin_user, status_code=200)
         
@@ -2903,6 +2939,8 @@ def get_user(userid: str):
     
     except Exception as e:
         print(f"Database error in get_user: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             content={"error": "Internal server error", "details": str(e)},
             status_code=500
