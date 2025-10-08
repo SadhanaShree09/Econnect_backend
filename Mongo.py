@@ -6891,21 +6891,21 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
             reviewer_ids.remove(uploaded_by_id)
         
         for reviewer_id in reviewer_ids:
-            # Get reviewer info
-            reviewer = Users.find_one({"_id": ObjectId(reviewer_id)}) if ObjectId.is_valid(reviewer_id) else Users.find_one({"userid": reviewer_id})
+            # Try to get reviewer info from both admin and Users collections
+            reviewer = None
+            if ObjectId.is_valid(reviewer_id):
+                reviewer = admin.find_one({"_id": ObjectId(reviewer_id)})
+                if not reviewer:
+                    reviewer = Users.find_one({"_id": ObjectId(reviewer_id)})
+            if not reviewer:
+                reviewer = Users.find_one({"userid": reviewer_id})
             if not reviewer:
                 continue
-            
             reviewer_name = reviewer.get("name", "Reviewer")
             reviewer_position = reviewer.get("position", "")
-            
             title = f"Document Uploaded for Review"
             message = f"Hi {reviewer_name}, {uploaded_by_name} has uploaded '{doc_name}' for your review. Please verify and approve."
-            
-            # Get role-based action URL for admin (should route to /admin/employee)
             action_url = get_role_based_action_url(reviewer_id, "document")
-            
-            # Create notification with WebSocket support
             notification_id = await create_notification_with_websocket(
                 userid=reviewer_id,
                 title=title,
@@ -6921,7 +6921,6 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
                     "action": "uploaded"
                 }
             )
-            
             notifications_sent.append(notification_id)
         
         print(f"✅ Document upload notifications sent to {len(notifications_sent)} reviewers")
