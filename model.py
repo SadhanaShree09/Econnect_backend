@@ -221,7 +221,7 @@ class AddEmployee(BaseModel):
     personal_email: str
     resume_link: str
     status: str
-    ip: str
+    # ip: str
     
 
 
@@ -240,7 +240,7 @@ class EditEmployee(BaseModel):
     personal_email: str
     resume_link: str
     status: str
-    ip: str
+    # ip: str
     
     @validator('skills')
     def validate_skills(cls, v):
