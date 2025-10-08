@@ -6870,7 +6870,7 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
         doc_name: Name of the document
         uploaded_by_name: Name of the person who uploaded
         uploaded_by_id: ID of the person who uploaded
-        reviewer_ids: List of IDs who should review (Admins only)
+        reviewer_ids: List of IDs who should review (specific admin who assigned the doc)
     """
     try:
         print(f"📤 Creating document upload notification: {doc_name} by {uploaded_by_name}")
@@ -6881,9 +6881,29 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
         if not reviewer_ids:
             reviewer_ids = []
             
-            # Get Admin users only (not HR, as only admins can review/verify docs in the admin UI)
-            admin_users = list(Users.find({"isadmin": True}))
-            reviewer_ids.extend([str(admin["_id"]) for admin in admin_users])
+            # Find the admin who assigned this specific document to the user
+            user = Users.find_one({"userid": userid})
+            if user and "assigned_docs" in user:
+                # Look for the specific document in assigned_docs
+                for doc in user.get("assigned_docs", []):
+                    # Check both possible field name formats (docName and doc_type)
+                    doc_name_match = doc.get("docName") == doc_name or doc.get("doc_type") == doc_name
+                    if doc_name_match:
+                        # Check both possible field name formats (assignedBy and assigned_by)
+                        assigned_by = doc.get("assignedBy") or doc.get("assigned_by")
+                        if assigned_by:
+                            # Try to find the admin who assigned this doc by name or userid
+                            assigner = Users.find_one({"name": assigned_by}) or Users.find_one({"userid": assigned_by})
+                            if assigner:
+                                reviewer_ids.append(str(assigner["_id"]))
+                                print(f"✅ Found admin who assigned doc '{doc_name}': {assigned_by}")
+                            break
+            
+            # If no specific admin found, notify all admins as fallback
+            if not reviewer_ids:
+                print(f"⚠️ No specific admin found for '{doc_name}', notifying all admins")
+                admin_users = list(Users.find({"isadmin": True}))
+                reviewer_ids.extend([str(admin["_id"]) for admin in admin_users])
         
         # Remove duplicates and the uploader
         reviewer_ids = list(set(reviewer_ids))
