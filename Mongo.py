@@ -6905,7 +6905,8 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
             reviewer_position = reviewer.get("position", "")
             title = f"Document Uploaded for Review"
             message = f"Hi {reviewer_name}, {uploaded_by_name} has uploaded '{doc_name}' for your review. Please verify and approve."
-            action_url = get_role_based_action_url(reviewer_id, "document")
+            # Always direct admin to the review docs page
+            action_url = "/admin/review-docs"
             notification_id = await create_notification_with_websocket(
                 userid=reviewer_id,
                 title=title,
