@@ -3644,12 +3644,13 @@ def get_role_based_action_url(userid, notification_type, base_path=None):
         # Get user info to determine role
         user = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else None
         if not user:
+            # Try admin collection if not found in Users
+            user = admin.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else None
+        if not user:
             return base_path or '/User/Clockin_int'
-        
         is_admin = user.get("isadmin", False)
         position = user.get("position", "").lower()
         department = user.get("department", "").lower()
-        
         # Determine user role - HR users should be treated as admin-level for routing
         is_hr = ("hr" in position or "hr" in department)
         is_admin_level = is_admin or is_hr
