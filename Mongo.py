@@ -3774,6 +3774,12 @@ def get_role_based_action_url(userid, notification_type, base_path=None):
                 'user': '/User/profile'
             },
             
+            # Document-related notifications
+            'document': {
+                'admin': '/admin/employee',  # Admin reviews documents in employee management
+                'user': '/User/profile'
+            },
+            
             # System notifications
             'system': {
                 'admin': '/admin/profile',
@@ -6895,15 +6901,21 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
                             # Try to find the admin who assigned this doc by name or userid
                             assigner = Users.find_one({"name": assigned_by}) or Users.find_one({"userid": assigned_by})
                             if assigner:
-                                reviewer_ids.append(str(assigner["_id"]))
-                                print(f"✅ Found admin who assigned doc '{doc_name}': {assigned_by}")
+                                # Verify the assigner is an admin (not HR)
+                                assigner_position = assigner.get("position", "")
+                                if assigner_position in ["Admin", "Administrator", "CEO", "Director"]:
+                                    reviewer_ids.append(str(assigner["_id"]))
+                                    print(f"✅ Found admin who assigned doc '{doc_name}': {assigned_by}")
+                                else:
+                                    print(f"⚠️ Document was assigned by {assigned_by} ({assigner_position}), not an admin")
                             break
             
-            # If no specific admin found, notify all admins as fallback
+            # If no specific admin found, notify all admins as fallback (exclude HR)
             if not reviewer_ids:
                 print(f"⚠️ No specific admin found for '{doc_name}', notifying all admins")
-                admin_users = list(Users.find({"isadmin": True}))
-                reviewer_ids.extend([str(admin["_id"]) for admin in admin_users])
+                # Get proper admin users (exclude HR by using position-based filtering)
+                admin_ids = await get_admin_user_ids()
+                reviewer_ids.extend(admin_ids)
         
         # Remove duplicates and the uploader
         reviewer_ids = list(set(reviewer_ids))
@@ -6922,14 +6934,17 @@ async def create_document_upload_notification(userid, doc_name, uploaded_by_name
             title = f"Document Uploaded for Review"
             message = f"Hi {reviewer_name}, {uploaded_by_name} has uploaded '{doc_name}' for your review. Please verify and approve."
             
-            # Create notification with WebSocket support (all admins go to /admin)
+            # Get role-based action URL for admin (should route to /admin/employee)
+            action_url = get_role_based_action_url(reviewer_id, "document")
+            
+            # Create notification with WebSocket support
             notification_id = await create_notification_with_websocket(
                 userid=reviewer_id,
                 title=title,
                 message=message,
                 notification_type="document",
                 priority="high",
-                action_url="/admin/review-docs",
+                action_url=action_url,
                 related_id=uploaded_by_id,
                 metadata={
                     "doc_name": doc_name,
