@@ -3776,7 +3776,7 @@ def get_role_based_action_url(userid, notification_type, base_path=None):
             
             # Document-related notifications
             'document': {
-                'admin': '/admin/employee',  # Admin reviews documents in employee management
+                'admin': '/admin/review-docs',  # Admin reviews documents in review-docs page
                 'user': '/User/profile'
             },
             
