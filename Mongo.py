@@ -2820,13 +2820,21 @@ def edit_the_task(
                             # Get verifier details (the person who verified - current user making the edit)
                             verifier = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else None
                             verifier_name = verifier.get("name", "Manager/HR") if verifier else "Manager/HR"
-                            verifier_role = get_user_role(userid) if verifier else "Manager"
+                            verifier_role = get_user_role(userid) if verifier else "manager"
+                            
+                            # Determine the verifier title based on role
+                            if verifier_role and "hr" in verifier_role:
+                                verifier_title = "HR"
+                            elif verifier_role and "manager" in verifier_role:
+                                verifier_title = "Manager"
+                            else:
+                                verifier_title = verifier_role.title() if verifier_role else "Manager"
                             
                             # Send notification to task owner
                             notification_id = create_notification(
                                 userid=task_owner_id,
                                 title="Task Verified",
-                                message=f"Your completed task '{task_title}' has been verified by {verifier_name}. Great work!",
+                                message=f"Your completed task '{task_title}' has been verified by {verifier_title}. Great work!",
                                 notification_type="task",
                                 priority="high",
                                 action_url=get_role_based_action_url(task_owner_id, "task"),
@@ -2836,7 +2844,7 @@ def edit_the_task(
                                     "action": "Verified",
                                     "verified_by": verifier_name,
                                     "verifier_id": userid,
-                                    "verifier_role": verifier_role
+                                    "verifier_role": verifier_title
                                 }
                             )
                             
@@ -2851,7 +2859,7 @@ def edit_the_task(
                                     asyncio.create_task(notification_manager.send_personal_notification(task_owner_id, {
                                         "_id": notification_id,
                                         "title": "Task Verified",
-                                        "message": f"Your completed task '{task_title}' has been verified by {verifier_name}. Great work!",
+                                        "message": f"Your completed task '{task_title}' has been verified by {verifier_title}. Great work!",
                                         "type": "task",
                                         "priority": "high"
                                     }))
@@ -2859,12 +2867,12 @@ def edit_the_task(
                                     loop.run_until_complete(notification_manager.send_personal_notification(task_owner_id, {
                                         "_id": notification_id,
                                         "title": "Task Verified",
-                                        "message": f"Your completed task '{task_title}' has been verified by {verifier_name}. Great work!",
+                                        "message": f"Your completed task '{task_title}' has been verified by {verifier_title}. Great work!",
                                         "type": "task",
                                         "priority": "high"
                                     }))
                                 
-                                print(f"Employee {task_owner_id} notified about task verification by {verifier_name}")
+                                print(f"Employee {task_owner_id} notified about task verification by {verifier_title}")
                             except Exception as ws_error:
                                 print(f"Error sending WebSocket notification for task verification: {ws_error}")
                 
