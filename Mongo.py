@@ -6958,11 +6958,11 @@ async def create_document_review_notification(userid, doc_name, reviewer_name, r
         
         # Set title and message based on status
         if status.lower() == "verified":
-            title = f"Document Approved ✅"
+            title = f"Document Approved "
             message = f"Hi {user_name}, your document '{doc_name}' has been approved by Admin."
             priority = "medium"
         elif status.lower() == "rejected":
-            title = f"Document Rejected ❌"
+            title = f"Document Rejected "
             message = f"Hi {user_name}, your document '{doc_name}' has been rejected by Admin."
             priority = "high"
         else:

@@ -98,7 +98,7 @@ async def check_and_notify_overdue_tasks():
                         
                         await create_notification_with_websocket(
                             userid=manager_id,
-                            title=f"🔔 Employee Task Overdue: {employee_name}",
+                            title=f"Employee Task Overdue: {employee_name}",
                             message=f"{employee_name}'s task '{task_title}' is {days_overdue} day(s) overdue. Immediate attention required.",
                             notification_type="employee_task_overdue",
                             priority="critical",
@@ -228,7 +228,7 @@ async def check_missed_attendance():
                     # Send missed clock-in notification
                     await create_notification_with_websocket(
                         userid=userid,
-                        title="⏰ Missed Clock-In Reminder",
+                        title="Missed Clock-In Reminder",
                         message=f"Hi {user_name}, you haven't clocked in today. Please clock in as soon as possible.",
                         notification_type="attendance",
                         priority="medium",
@@ -288,7 +288,7 @@ async def check_missed_clock_out():
                 # Send missed clock-out notification
                 await create_notification_with_websocket(
                     userid=userid,
-                    title="⏰ Missed Clock-Out Reminder",
+                    title="Missed Clock-Out Reminder",
                     message=f"Hi {user_name}, you clocked in at {clockin_time} but haven't clocked out yet. Please remember to clock out.",
                     notification_type="attendance",
                     priority="medium",
@@ -351,7 +351,7 @@ async def check_pending_approvals():
                     
                     await create_notification_with_websocket(
                         userid=approver_id,
-                        title=f"📋 Pending Leave Approval: {employee_name}",
+                        title=f"Pending Leave Approval: {employee_name}",
                         message=f"{employee_name} has requested {leave_type} from {from_date} to {to_date}. Status: {status}",
                         notification_type="leave_approval_required",
                         priority="medium",
@@ -402,7 +402,7 @@ async def check_pending_approvals():
                     
                     await create_notification_with_websocket(
                         userid=approver_id,
-                        title=f"🏠 Pending WFH Approval: {employee_name}",
+                        title=f"Pending WFH Approval: {employee_name}",
                         message=f"{employee_name} has requested Work From Home from {from_date} to {to_date}. Status: {status}",
                         notification_type="wfh_approval_required",
                         priority="medium",
@@ -473,7 +473,7 @@ async def notify_wfh_submitted_to_manager(employee_name, employee_id, request_da
         
         return await create_notification_with_websocket(
             userid=manager_id,
-            title=f"🏠 New WFH Request: {employee_name}",
+            title=f"New WFH Request: {employee_name}",
             message=f"{employee_name} has submitted a work from home request {date_range}. Please review and approve.",
             notification_type="wfh_manager_approval",
             priority="high",
@@ -510,7 +510,7 @@ async def notify_wfh_recommended_to_hr(employee_name, employee_id, request_date_
             hr_id = str(hr_user["_id"])
             await create_notification_with_websocket(
                 userid=hr_id,
-                title=f"🏠 WFH Request Recommended: {employee_name}",
+                title=f"WFH Request Recommended: {employee_name}",
                 message=f"{employee_name}'s work from home request {date_range} has been recommended by {recommended_by} for HR approval.",
                 notification_type="wfh_hr_approval",
                 priority="high",
@@ -541,7 +541,7 @@ async def notify_wfh_approved_to_employee(userid, employee_name, request_date_fr
         
         return await create_notification_with_websocket(
             userid=userid,
-            title=f"✅ WFH Request Approved",
+            title=f"WFH Request Approved",
             message=f"Your work from home request {date_range} has been approved by {approved_by}.",
             notification_type="wfh_approved",
             priority="medium",
@@ -568,7 +568,7 @@ async def notify_wfh_rejected_to_employee(userid, employee_name, request_date_fr
         
         return await create_notification_with_websocket(
             userid=userid,
-            title=f"❌ WFH Request Rejected",
+            title=f"WFH Request Rejected",
             message=f"Your work from home request {date_range} has been rejected by {rejected_by}.{reason_text}",
             notification_type="wfh_rejected",
             priority="high",

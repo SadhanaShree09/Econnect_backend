@@ -515,7 +515,7 @@ async def test_notifications(userid: str):
         # Create a test notification with WebSocket
         notification_id = create_notification(
             userid=userid,
-            title="🧪 Test Notification",
+            title="Test Notification",
             message="This is a test notification to verify the enhanced system is working perfectly!",
             notification_type="system",
             priority="medium",
@@ -527,7 +527,7 @@ async def test_notifications(userid: str):
             notification_data = {
                 "_id": notification_id,
                 "userid": userid,
-                "title": "🧪 Test Notification",
+                "title": "Test Notification",
                 "message": "This is a test notification to verify the enhanced system is working perfectly!",
                 "type": "system",
                 "priority": "medium",
@@ -4959,7 +4959,7 @@ async def test_simple_notification(userid: str):
         # Create a simple notification
         notification_id = Mongo.create_notification(
             userid=userid,
-            title="🔔 Test Notification",
+            title="Test Notification",
             message="This is a test notification to verify the system is working correctly.",
             notification_type="system",
             priority="medium",
@@ -4971,7 +4971,7 @@ async def test_simple_notification(userid: str):
             from websocket_manager import notification_manager
             await notification_manager.send_personal_notification(userid, {
                 "_id": notification_id,
-                "title": "🔔 Test Notification", 
+                "title": "Test Notification", 
                 "message": "This is a test notification to verify the system is working correctly.",
                 "type": "system",
                 "priority": "medium",
