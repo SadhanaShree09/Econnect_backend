@@ -3756,27 +3756,27 @@ def get_role_based_action_url(userid, notification_type, base_path=None):
             # Task-related notifications
             'task': {
                 'admin': '/admin/task',
-                'user': '/User/task'
+                'user': '/user/todo'
             },
             'task_created': {
                 'admin': '/admin/task',
-                'user': '/User/task'
+                'user': '/user/todo'
             },
             'task_manager_assigned': {
                 'admin': '/admin/task',
-                'user': '/User/task'
+                'user': '/user/todo'
             },
             'task_overdue': {
                 'admin': '/admin/task',
-                'user': '/User/task'
+                'user': '/user/todo'
             },
             'task_due_soon': {
                 'admin': '/admin/task',
-                'user': '/User/task'
+                'user': '/user/todo'
             },
             'manager_task': {
                 'admin': '/admin/task',
-                'user': '/User/task'
+                'user': '/user/todo'
             },
             'hr_task': {
                 'admin': '/admin/task',
@@ -4617,7 +4617,7 @@ async def create_overdue_task_notification(userid, task_title, due_date, task_id
             message=message,
             notification_type="task_overdue",
             priority="high",
-            action_url="/User/task",
+            action_url="/user/todo",
             related_id=task_id,
             metadata={
                 "task_title": task_title,
@@ -4637,7 +4637,7 @@ async def create_overdue_task_notification(userid, task_title, due_date, task_id
                 "message": message,
                 "type": "task_overdue",
                 "priority": "high",
-                "action_url": "/User/task",
+                "action_url": "/user/todo",
                 "related_id": task_id,
                 "is_read": False,
                 "created_at": get_current_timestamp_iso()
@@ -4817,7 +4817,7 @@ async def create_deadline_reminder_notification(task):
             message=message,
             notification_type="task_deadline_reminder",
             priority="medium",
-            action_url="/User/task",
+            action_url="/user/todo",
             related_id=task_id,
             metadata={
                 "task_title": task_title,
@@ -4837,7 +4837,7 @@ async def create_deadline_reminder_notification(task):
                 "message": message,
                 "type": "task_deadline_reminder",
                 "priority": "medium",
-                "action_url": "/User/task",
+                "action_url": "/user/todo",
                 "related_id": task_id,
                 "is_read": False,
                 "created_at": get_current_timestamp_iso()
@@ -4870,7 +4870,7 @@ async def create_task_created_notification(userid, task_title, creator_name, tas
             message=message,
             notification_type="task_created",
             priority=priority,
-            action_url="/User/task",
+            action_url="/user/todo",
             related_id=task_id,
             metadata={
                 "task_title": task_title,
@@ -4890,7 +4890,7 @@ async def create_task_created_notification(userid, task_title, creator_name, tas
                 "message": message,
                 "type": "task_created",
                 "priority": priority,
-                "action_url": "/User/task",
+                "action_url": "/user/todo",
                 "related_id": task_id,
                 "is_read": False,
                 "created_at": get_current_timestamp_iso()
@@ -4934,7 +4934,7 @@ async def create_task_updated_notification(userid, task_title, updater_name, cha
             message=message,
             notification_type="task_updated",
             priority=priority,
-            action_url="/User/task",
+            action_url="/user/todo",
             related_id=task_id,
             metadata={
                 "task_title": task_title,
@@ -4954,7 +4954,7 @@ async def create_task_updated_notification(userid, task_title, updater_name, cha
                 "message": message,
                 "type": "task_updated",
                 "priority": priority,
-                "action_url": "/User/task",
+                "action_url": "/user/todo",
                 "related_id": task_id,
                 "is_read": False,
                 "created_at": get_current_timestamp_iso()
@@ -5004,7 +5004,7 @@ async def create_task_manager_assigned_notification(userid, task_title, manager_
             message=message,
             notification_type="task_manager_assigned",
             priority=priority,
-            action_url="/User/task",
+            action_url="/user/todo",
             related_id=task_id,
             metadata={
                 "task_title": task_title,
@@ -5025,7 +5025,7 @@ async def create_task_manager_assigned_notification(userid, task_title, manager_
                 "message": message,
                 "type": "task_manager_assigned",
                 "priority": priority,
-                "action_url": "/User/task",
+                "action_url": "/user/todo",
                 "related_id": task_id,
                 "is_read": False,
                 "created_at": get_current_timestamp_iso()
@@ -5075,7 +5075,7 @@ async def create_task_due_soon_notification(userid, task_title, task_id, days_re
             message=message,
             notification_type="task_due_soon",
             priority=priority,
-            action_url="/User/task",
+            action_url="/user/todo",
             related_id=task_id,
             metadata={
                 "task_title": task_title,
@@ -5094,7 +5094,7 @@ async def create_task_due_soon_notification(userid, task_title, task_id, days_re
                 "message": message,
                 "type": "task_due_soon",
                 "priority": priority,
-                "action_url": "/User/task",
+                "action_url": "/user/todo",
                 "related_id": task_id,
                 "is_read": False,
                 "created_at": get_current_timestamp_iso()
