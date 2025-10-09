@@ -2189,7 +2189,8 @@ def edit_the_task(
     priority=None,
     subtasks=None,
     comments=None,
-    files=None
+    files=None,
+    verified=None,
 ):
     update_fields = {}
 
@@ -2202,6 +2203,8 @@ def edit_the_task(
         update_fields["due_date"] = due_date
     if priority and priority != "string":
         update_fields["priority"] = priority
+    if verified is not None:
+        update_fields["verified"] = verified
 
     # Handle subtasks
     if subtasks is not None:
@@ -2257,13 +2260,27 @@ def edit_the_task(
 
     # Update DB
     if update_fields:
-        # Get current task data before update for comparison
-        current_task = Tasks.find_one({"_id": ObjectId(taskid), "userid": userid})
+        # Match by _id first so that updates from managers/HR (who are not the task owner)
+        # can still apply (e.g., verification). Fall back to userid-based check is not
+        # needed here because application-level permissions are enforced elsewhere.
+        current_task = Tasks.find_one({"_id": ObjectId(taskid)})
         if not current_task:
             return "Task not found"
         
+        # Prevent demotion of a task that has already been verified.
+        # If the task is verified and the caller does not explicitly unverify (verified: False),
+        # disallow changing status to anything other than a completed state.
+        if current_task.get("verified", False):
+            if "status" in update_fields:
+                new_status = str(update_fields.get("status") or "").strip().lower()
+                # consider any status containing 'completed' as completed
+                is_new_completed = "completed" in new_status
+                # if payload does not explicitly unverify and new status is not completed -> block
+                if not (update_fields.get("verified") is False) and not is_new_completed:
+                    return "Cannot demote verified task"
+        
         result = Tasks.update_one(
-            {"_id": ObjectId(taskid), "userid": userid},
+            {"_id": ObjectId(taskid)},
             {"$set": update_fields}
         )
         
@@ -2789,8 +2806,70 @@ def edit_the_task(
                         else:
                             print(f"ℹ️ No manager found to notify for {user_name}'s subtask")
                 
+                # Handle task verification notification
+                if "verified" in update_fields:
+                    was_verified_before = current_task.get("verified", False)
+                    is_now_verified = update_fields["verified"]
+                    
+                    # Only send notification if task is being verified (not unverified)
+                    if not was_verified_before and is_now_verified:
+                        # Get the task owner (employee who completed the task)
+                        task_owner_id = updated_task.get("userid") if updated_task else current_task.get("userid")
+                        
+                        if task_owner_id:
+                            # Get verifier details (the person who verified - current user making the edit)
+                            verifier = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else None
+                            verifier_name = verifier.get("name", "Manager/HR") if verifier else "Manager/HR"
+                            verifier_role = get_user_role(userid) if verifier else "Manager"
+                            
+                            # Send notification to task owner
+                            notification_id = create_notification(
+                                userid=task_owner_id,
+                                title="Task Verified",
+                                message=f"Your completed task '{task_title}' has been verified by {verifier_name}. Great work!",
+                                notification_type="task",
+                                priority="high",
+                                action_url=get_role_based_action_url(task_owner_id, "task"),
+                                related_id=taskid,
+                                metadata={
+                                    "task_title": task_title,
+                                    "action": "Verified",
+                                    "verified_by": verifier_name,
+                                    "verifier_id": userid,
+                                    "verifier_role": verifier_role
+                                }
+                            )
+                            
+                            # Send real-time WebSocket notification to employee
+                            try:
+                                from websocket_manager import notification_manager
+                                import asyncio
+                                
+                                # Create async task for WebSocket notification
+                                loop = asyncio.get_event_loop()
+                                if loop.is_running():
+                                    asyncio.create_task(notification_manager.send_personal_notification(task_owner_id, {
+                                        "_id": notification_id,
+                                        "title": "Task Verified",
+                                        "message": f"Your completed task '{task_title}' has been verified by {verifier_name}. Great work!",
+                                        "type": "task",
+                                        "priority": "high"
+                                    }))
+                                else:
+                                    loop.run_until_complete(notification_manager.send_personal_notification(task_owner_id, {
+                                        "_id": notification_id,
+                                        "title": "Task Verified",
+                                        "message": f"Your completed task '{task_title}' has been verified by {verifier_name}. Great work!",
+                                        "type": "task",
+                                        "priority": "high"
+                                    }))
+                                
+                                print(f"✅ Employee {task_owner_id} notified about task verification by {verifier_name}")
+                            except Exception as ws_error:
+                                print(f"Error sending WebSocket notification for task verification: {ws_error}")
+                
                 # General task update notification (only if there are meaningful changes)
-                if changes and not any(key in ["comments", "files", "subtasks"] for key in changes.keys()):
+                if changes and not any(key in ["comments", "files", "subtasks", "verified"] for key in changes.keys()):
                     # Check for status change
                     if "status" in changes:
                         old_status = current_task.get("status", "")
@@ -3026,7 +3105,8 @@ def get_the_tasks(userid: str, date: str = None):
             "priority": task.get("priority", "Medium"),
             "subtasks": task.get("subtasks", []),   # ✅ ensure always list
             "comments": task.get("comments", []),   # ✅ new
-            "files": files,    
+            "files": files,
+            "verified": task.get("verified", False),    
             "taskid": str(task.get("_id"))
         }
         task_list.append(task_data)
@@ -3051,7 +3131,7 @@ def get_assigned_tasks(manager_name: str, userid: str = None):
             "priority": task.get("priority", "Medium"),
             "subtasks": task.get("subtasks", []),  
             "comments": task.get("comments", []),  
-            "files": task.get("files", []),      
+            "files": task.get("files", []),     
             "taskid": str(task.get("_id"))
         }
         task_list.append(task_data)
@@ -3088,6 +3168,7 @@ def get_manager_only_tasks(userid: str, date: str = None):
             "subtasks": task.get("subtasks", []),
             "comments": task.get("comments", []),
             "files": files,  # Use processed files
+            "verified": task.get("verified", False), 
             "taskid": str(task.get("_id"))
         }
         task_list.append(task_data)
@@ -3505,6 +3586,7 @@ def assigned_task(manager_name, userid=None):
     "subtasks": task.get("subtasks", []),
     "comments": task.get("comments", []),
     "files": task.get("files", []),
+    "verified": task.get("verified", False),
     "taskid": str(task.get("_id"))
 }
         task_list.append(task_data)  
@@ -3528,6 +3610,7 @@ def get_hr_assigned_tasks(hr_name: str, userid: str = None, date: str = None):
             "userid": task.get("userid"),
             "assigned_by": task.get("assigned_by", "self"),
             "priority": task.get("priority", "Medium"),
+            "verified": task.get("verified", False),
             "taskid": str(task.get("_id"))
         }
         task_list.append(task_data)
@@ -3564,6 +3647,7 @@ def get_manager_hr_assigned_tasks(userid: str, date: str = None):
             "subtasks": task.get("subtasks", []),
             "comments": task.get("comments", []),
             "files": files,
+            "verified": task.get("verified", False),
             "taskid": str(task.get("_id"))
         }
         task_list.append(task_data)

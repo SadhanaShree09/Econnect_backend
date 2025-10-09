@@ -183,7 +183,9 @@ class Taskedit(BaseModel):
     priority: Optional[str] = None 
     subtasks: Optional[List[Any]] = [] 
     comments: Optional[List[Any]] = [] 
-    files: Optional[List[Any]] = [] 
+    files: Optional[List[Any]] = []
+    verified: Optional[bool] = None 
+
 
 class Gettasks(BaseModel):
     userid: str
