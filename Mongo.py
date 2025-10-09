@@ -6789,12 +6789,12 @@ async def create_chat_message_notification(sender_id, receiver_id, sender_name, 
         
         receiver_name = receiver.get("name", "User")
         
-        # Truncate message preview
-        if len(message_preview) > 50:
-            message_preview = message_preview[:47] + "..."
+        # # Truncate message preview
+        # if len(message_preview) > 50:
+        #     message_preview = message_preview[:47] + "..."
         
         title = f"New Message from {sender_name}"
-        message = f"Hi {receiver_name}, {sender_name} sent you a message: '{message_preview}'"
+        message = f"Hi {receiver_name}, {sender_name} sent you a message"
         
         # Check for duplicate notifications (same sender and receiver within last 30 seconds)
         thirty_seconds_ago = datetime.now(pytz.timezone("Asia/Kolkata")) - timedelta(seconds=30)
