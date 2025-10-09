@@ -1475,7 +1475,7 @@ def updated_user_leave_requests_status_in_mongo(leave_id, status):
                             recommended_by="Approver",
                             leave_id=leave_id
                         ))
-                        print(f"✅ Scheduled HR notification for recommended leave: {response_data['employee_name']}")
+                        print(f"Scheduled HR notification for recommended leave: {response_data['employee_name']}")
                     else:
                         # If no loop, run sync
                         loop.run_until_complete(notify_hr_recommended_leave(
@@ -1486,11 +1486,11 @@ def updated_user_leave_requests_status_in_mongo(leave_id, status):
                             recommended_by="Approver",
                             leave_id=leave_id
                         ))
-                        print(f"✅ Immediate HR notification sent for recommended leave: {response_data['employee_name']}")
+                        print(f"Immediate HR notification sent for recommended leave: {response_data['employee_name']}")
                 except Exception as hr_notify_error:
-                    print(f"⚠️ Error sending immediate HR notification: {hr_notify_error}")
+                    print(f"Error sending immediate HR notification: {hr_notify_error}")
             
-            print(f"✅ HR final decision processed: {status} for {response_data['employee_name']}")
+            print(f"HR final decision processed: {status} for {response_data['employee_name']}")
             return response_data
         else:
             return {"message": "No records found for the given leave ID or the status is already updated"}
@@ -1544,7 +1544,7 @@ def recommend_manager_leave_requests_status_in_mongo(leave_id, status):
                             recommended_by=response_data["recommender_name"],
                             leave_id=leave_id
                         ))
-                        print(f"✅ Scheduled HR notification for recommended leave: {response_data['employee_name']}")
+                        print(f"Scheduled HR notification for recommended leave: {response_data['employee_name']}")
                     else:
                         # If no loop, run sync
                         loop.run_until_complete(notify_hr_recommended_leave(
@@ -1555,9 +1555,9 @@ def recommend_manager_leave_requests_status_in_mongo(leave_id, status):
                             recommended_by=response_data["recommender_name"],
                             leave_id=leave_id
                         ))
-                        print(f"✅ Immediate HR notification sent for recommended leave: {response_data['employee_name']}")
+                        print(f"Immediate HR notification sent for recommended leave: {response_data['employee_name']}")
                 except Exception as hr_notify_error:
-                    print(f"⚠️ Error sending immediate HR notification: {hr_notify_error}")
+                    print(f"Error sending immediate HR notification: {hr_notify_error}")
             
             return response_data
         else:
@@ -1843,10 +1843,10 @@ def update_remote_work_request_status_in_mongo(userid, status, wfh_id):
         
         result = RemoteWork.update_one({"_id":ObjectId(wfh_id), "userid": userid, "status":None, "Recommendation": "Recommend"}, {"$set": {"status": status}, "$unset": { "Recommendation": ""}})
         if result.modified_count > 0:
-            print(f"✅ WFH status updated successfully to {status}")
+            print(f"WFH status updated successfully to {status}")
             return True
         else:
-            print(f"❌ No WFH request updated - check conditions")
+            print(f"No WFH request updated - check conditions")
             return False
     except Exception as e:
         print(f"Error updating WFH status: {e}")
@@ -2386,7 +2386,7 @@ def edit_the_task(
                                             "priority": "medium"
                                         }))
                                     
-                                    print(f"✅ HR {hr_name} notified about Manager {commenter_name}'s comment: {comment_text[:30]}...")
+                                    print(f"HR {hr_name} notified about Manager {commenter_name}'s comment: {comment_text[:30]}...")
                                 except Exception as ws_error:
                                     print(f"Error sending WebSocket notification to HR: {ws_error}")
                         
@@ -2468,13 +2468,13 @@ def edit_the_task(
                                                 "priority": "medium"
                                             }))
                                         
-                                        print(f"✅ Manager {manager_name} notified about {commenter_name}'s comment: {comment_text[:30]}...")
+                                        print(f"Manager {manager_name} notified about {commenter_name}'s comment: {comment_text[:30]}...")
                                     except Exception as ws_error:
                                         print(f"Error sending WebSocket notification to manager: {ws_error}")
                                 else:
-                                    print(f"⚠️ Manager not found: {manager_to_notify}")
+                                    print(f"Manager not found: {manager_to_notify}")
                             else:
-                                print(f"ℹ️ No manager found to notify for {commenter_name}'s comment")
+                                print(f"No manager found to notify for {commenter_name}'s comment")
                 
                 if "files" in update_fields and len(update_fields["files"]) > len(current_task.get("files", [])):
                     # New file uploaded
@@ -2564,7 +2564,7 @@ def edit_the_task(
                                             "priority": "medium"
                                         }))
                                     
-                                    print(f"✅ HR {hr_name} notified about Manager {uploader_name}'s file upload: {filename}")
+                                    print(f"HR {hr_name} notified about Manager {uploader_name}'s file upload: {filename}")
                                 except Exception as ws_error:
                                     print(f"Error sending WebSocket notification to HR: {ws_error}")
                         
@@ -2646,13 +2646,13 @@ def edit_the_task(
                                                 "priority": "medium"
                                             }))
                                         
-                                        print(f"✅ Manager {manager_name} notified about {uploader_name}'s file upload: {filename}")
+                                        print(f"Manager {manager_name} notified about {uploader_name}'s file upload: {filename}")
                                     except Exception as ws_error:
                                         print(f"Error sending WebSocket notification to manager: {ws_error}")
                                 else:
-                                    print(f"⚠️ Manager not found: {manager_to_notify}")
+                                    print(f"Manager not found: {manager_to_notify}")
                             else:
-                                print(f"ℹ️ No manager found to notify for {uploader_name}'s file upload")
+                                print(f"No manager found to notify for {uploader_name}'s file upload")
                 
                 if "subtasks" in update_fields and len(update_fields["subtasks"]) > len(current_task.get("subtasks", [])):
                     # New subtask added
@@ -2717,7 +2717,7 @@ def edit_the_task(
                                         "priority": "medium"
                                     }))
                                 
-                                print(f"✅ HR {hr_name} notified about Manager {user_name}'s subtask: {subtask_text}")
+                                print(f"HR {hr_name} notified about Manager {user_name}'s subtask: {subtask_text}")
                             except Exception as ws_error:
                                 print(f"Error sending WebSocket notification to HR: {ws_error}")
                     
@@ -2798,13 +2798,13 @@ def edit_the_task(
                                             "priority": "medium"
                                         }))
                                     
-                                    print(f"✅ Manager {manager_name} notified about {user_name}'s subtask: {subtask_text}")
+                                    print(f"Manager {manager_name} notified about {user_name}'s subtask: {subtask_text}")
                                 except Exception as ws_error:
                                     print(f"Error sending WebSocket notification to manager: {ws_error}")
                             else:
-                                print(f"⚠️ Manager not found: {manager_to_notify}")
+                                print(f"Manager not found: {manager_to_notify}")
                         else:
-                            print(f"ℹ️ No manager found to notify for {user_name}'s subtask")
+                            print(f"No manager found to notify for {user_name}'s subtask")
                 
                 # Handle task verification notification
                 if "verified" in update_fields:
@@ -2864,7 +2864,7 @@ def edit_the_task(
                                         "priority": "high"
                                     }))
                                 
-                                print(f"✅ Employee {task_owner_id} notified about task verification by {verifier_name}")
+                                print(f"Employee {task_owner_id} notified about task verification by {verifier_name}")
                             except Exception as ws_error:
                                 print(f"Error sending WebSocket notification for task verification: {ws_error}")
                 
@@ -2901,7 +2901,7 @@ def edit_the_task(
                             user = Users.find_one({"_id": ObjectId(userid)}) if ObjectId.is_valid(userid) else None
                             assignee_name = user.get("name", "Employee") if user else "Employee"
                             
-                            print(f"🔍 Task completion debug - assigned_by: {assigned_by}, TL: {tl}, userid: {userid}")
+                            print(f"Task completion debug - assigned_by: {assigned_by}, TL: {tl}, userid: {userid}")
                             
                             # Determine the manager to notify
                             manager_to_notify = None
@@ -2909,12 +2909,12 @@ def edit_the_task(
                             # Case 1: Task assigned by a specific manager (assigned_by is not "self")
                             if assigned_by and assigned_by != "self" and assigned_by != userid:
                                 manager_to_notify = assigned_by
-                                print(f"📋 Task assigned by manager: {assigned_by}")
+                                print(f"Task assigned by manager: {assigned_by}")
                             
                             # Case 2: Check if task has TL field (Team Leader)
                             elif tl and tl != userid:
                                 manager_to_notify = tl
-                                print(f"👥 Task assigned by TL: {tl}")
+                                print(f"Task assigned by TL: {tl}")
                             
                             # Case 3: Find user's manager from their profile
                             elif user:
@@ -2922,10 +2922,10 @@ def edit_the_task(
                                 user_manager = user.get("manager") 
                                 if user_tl and user_tl != userid:
                                     manager_to_notify = user_tl
-                                    print(f"👤 User's TL from profile: {user_tl}")
+                                    print(f"User's TL from profile: {user_tl}")
                                 elif user_manager and user_manager != userid:
                                     manager_to_notify = user_manager
-                                    print(f"👤 User's manager from profile: {user_manager}")
+                                    print(f"User's manager from profile: {user_manager}")
                             
                             # Send notification to the identified manager
                             if manager_to_notify:
@@ -2945,7 +2945,7 @@ def edit_the_task(
                                     manager_id = str(manager["_id"])
                                     manager_name = manager.get("name", "Manager")
                                     
-                                    print(f"✅ Notifying manager {manager_name} ({manager_id}) about {assignee_name}'s task completion")
+                                    print(f"Notifying manager {manager_name} ({manager_id}) about {assignee_name}'s task completion")
                                     
                                     # Use enhanced hierarchy-based notification system
                                     import asyncio
@@ -2957,7 +2957,7 @@ def edit_the_task(
                                             assignee_name=assignee_name,
                                             task_id=taskid
                                         ))
-                                        print(f"✅ Hierarchy completion notifications sent: {len(completion_notifications) if completion_notifications else 0}")
+                                        print(f"Hierarchy completion notifications sent: {len(completion_notifications) if completion_notifications else 0}")
                                     except Exception as e:
                                         print(f"Error sending hierarchy completion notifications: {e}")
                                         # Fallback to direct notification
@@ -2977,12 +2977,12 @@ def edit_the_task(
                                             }
                                         )
                                 else:
-                                    print(f"⚠️ Manager not found: {manager_to_notify}")
+                                    print(f"Manager not found: {manager_to_notify}")
                             else:
                                 # Handle case where no manager is found - check if user is a manager themselves
                                 user_role = get_user_role(userid)
                                 if user_role == "manager":
-                                    print(f"🏢 Manager {assignee_name} completed own task - notifying HR")
+                                    print(f"Manager {assignee_name} completed own task - notifying HR")
                                     import asyncio
                                     try:
                                         completion_notifications = asyncio.run(create_task_completion_notification(
@@ -2992,11 +2992,11 @@ def edit_the_task(
                                             assignee_name=assignee_name,
                                             task_id=taskid
                                         ))
-                                        print(f"✅ Manager self-task completion notifications sent to HR: {len(completion_notifications) if completion_notifications else 0}")
+                                        print(f"Manager self-task completion notifications sent to HR: {len(completion_notifications) if completion_notifications else 0}")
                                     except Exception as e:
                                         print(f"Error sending manager self-task completion notifications: {e}")
                                 else:
-                                    print(f"ℹ️ No manager found to notify for employee {assignee_name}'s task completion")
+                                    print(f"No manager found to notify for employee {assignee_name}'s task completion")
                     else:
                         # Other field changes
                         change_details = []
@@ -3533,7 +3533,7 @@ async def task_assign_to_multiple_users_with_notification(task_details, assigner
                         priority="high"
                     )
                 
-                print(f"✅ Sent enhanced notification to user {userid} for {task_count} tasks")
+                print(f"Sent enhanced notification to user {userid} for {task_count} tasks")
             except Exception as e:
                 print(f"Error sending enhanced notification to user {userid}: {e}")
     else:
@@ -3691,13 +3691,17 @@ def get_hr_self_assigned_tasks(userid: str, date: str = None):
     return task_list
 
 def get_user_by_position(position):
-    user = Users.find_one({"position": position}, {"_id": 0, "password": 0})
-    if user:
-        # Add userid field for consistency with your frontend expectations
-        user_info = Users.find_one({"position": position})
-        if user_info:
-            user["userid"] = str(user_info["_id"])
-    return user
+    users = Users.find({"position": position}, {"_id": 1, "name": 1, "position": 1})
+    
+    result = []
+    for u in users:
+        result.append({
+            "userid": str(u["_id"]),
+            "name": u.get("name"),
+            "position": u.get("position")
+        })
+    
+    return result
 
 def get_team_members(TL):
     team_members = list(Users.find({"TL":TL}, {"_id":0}))
